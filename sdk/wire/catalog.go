@@ -74,6 +74,10 @@ type SnapshotDownloadRequest struct {
 // (api-v1 §5.4).
 type SnapshotDownloadResult struct {
 	DownloadURL string `json:"download_url"`
+	// Rev 1.1c additions.
+	ExpiresAt int64 `json:"expires_at,omitempty"`
+	Files     int64 `json:"files,omitempty"`
+	Bytes     int64 `json:"bytes,omitempty"`
 }
 
 // CatalogRebuildRequest is the body of POST /catalog/rebuild (sess;

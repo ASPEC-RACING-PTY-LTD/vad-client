@@ -61,6 +61,8 @@ type BackupServer interface {
 	UpdateJob(ctx context.Context, id, revision int64, req wire.JobUpdateRequest) (*wire.Job, error)
 	RunIssues(ctx context.Context, runID int64, class, cursor string, limit int) (*wire.List[wire.Issue], error)
 	SkipIssues(ctx context.Context, runID int64, req wire.IssueSkipRequest) (*wire.BulkResult, error)
+	DeviceRestore(ctx context.Context, id int64) (*wire.DeviceRestore, error)
+	ReportRestore(ctx context.Context, id int64, p wire.RestoreProgress) (*wire.RestoreProgressReply, error)
 }
 
 var _ BackupServer = (*client.Client)(nil)
@@ -450,11 +452,12 @@ func (h *Host) runLoops(s *backupStack) {
 	s.setLoop(cancel, sched)
 	defer s.setLoop(nil, nil)
 
+	rj := h.restoreJobs(s)
 	loop := &backup.TaskLoop{
 		API:      &taskAPI{BackupServer: s.srv, divert: func(t wire.DeviceTask) bool { return h.divertTask(ctx, s, t) }},
 		Backups:  stackRuns{s},
 		Keys:     verifiedKeys{h: h, s: s},
-		Handlers: map[string]backup.TaskHandler{wire.TaskKindProfileConsentRequest: h.consentTask(s)},
+		Handlers: map[string]backup.TaskHandler{wire.TaskKindProfileConsentRequest: h.consentTask(s), wire.TaskKindRestore: h.restoreTask(s, rj)},
 		Wait:     bk.o.TaskWait,
 		Log:      h.log,
 	}

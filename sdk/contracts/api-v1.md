@@ -384,3 +384,32 @@ The server never edits the host `.env`. Only `install.sh` does.
   - **`rewrap {repo_id, epoch}`**: rotate to `epoch` when the repo is at `epoch-1`; report done when already at or past it. Revoked devices are excluded using the device's own view of revoked devices.
   - **Issue classes.** Desktop-local reasons `efs_needs_logon` and `profile_needs_logon` are reported as `access_denied` and `other` with the reason in `detail`.
   - **Issue routes.** `GET /backup/runs/{id}/issues`, `POST …/issues/skip` and `POST …/retry-skipped` accept sessions and device signatures (`user` auth). A device may act only on its own device's runs; others get `404`.
+- **Rev 1.1c (2026-10-18, INT), Phase 2 restore.** Additive only.
+  - **Feature flag `restore.v1`.** Advertised when the restore routes below and `/restore/*` are implemented.
+  - **Plan.**
+    - **Fields:** `POST /restore/plan` takes `selection` paths as snapshot token paths (for example `{DOCUMENTS}/Reports`). An empty selection means the whole snapshot.
+    - **Who may plan:** the snapshot must belong to the caller, and the target device to the same user (else `404`).
+    - **Target profile:** it must be `authorised` or `active_default` on the target device (`403 profile_not_authorised`, `423 profile_blacklisted`). With none given, the snapshot's own profile is used.
+    - **Catalog:** the plan is computed from the encrypted catalog, so it works under both escrow modes. Before ingestion is done the reply is `409 catalog_pending`.
+    - **Mappings:** one per token used by the selection, with `auto:true` and an empty `to`. The device resolves them for the target profile. `mapping.overrides[{from,to}]` map a token path prefix to an absolute target folder.
+    - **Conflicts:** the server never computes them (`summary.conflicts` is 0). The device decides per file and reports items.
+  - **Execute.** `POST /restore/execute {plan_token}` creates the restore (`awaiting_approval`) and an approval of kind `restore` decided by the owner. On approval, the restore becomes `queued` and the server queues a `restore` device task (payload `{restore_id}`). On reject or expiry it becomes `cancelled`.
+  - **Device routes (dev).** The device must be the restore's target device; anyone else gets `404`.
+    - `GET /device/restores/{id}` → `DeviceRestore {restore, repo_id, repo_uuid, snapshot_oid, selection, mappings, overrides, target_profile_sid, conflict_policy, cancel_requested}`.
+    - `POST /device/restores/{id}/progress` with `RestoreProgress {status, files_total, files_done, bytes_total, bytes_done, error?, items[≤1000]}` → `{status, cancel_requested}`.
+      - `status` is `running` or a terminal status: `completed`, `partial`, `failed` or `cancelled`.
+      - A report on a terminal restore is `409 conflict`.
+      - Items are appended. Item `status` is `pending`, `done`, `skipped`, `failed` or `blocked` (system-file protection, §10.3).
+    - The device acknowledges the `restore` task as soon as it starts. Progress then goes only through these routes, because a restore can outlive the task lease.
+  - **Cancel.** `POST /restore/{id}/cancel` (sess):
+    - `awaiting_approval` or `queued` → `cancelled` (the pending approval and task are cancelled);
+    - `running` → `cancel_requested:true`, which the device sees on its next progress reply;
+    - a terminal restore → `409 conflict`.
+  - **Restore fields.** `Restore` adds `conflict_policy`, `cancel_requested`, `error` and `finished_at`. Item `size` is optional.
+  - **Snapshot content and download (full escrow).**
+    - `GET /snapshots/{id}/content?path=` streams one file. It supports Range, sends `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`, and verifies the keyed whole-file hash.
+    - `POST /snapshots/{id}/download {paths[1..100]}` (folders are expanded) → `202 {operation_id}`, operation kind `snapshot_download`. Its result is `SnapshotDownloadResult {download_url, expires_at, files, bytes}`.
+    - `download_url` is `/api/v1/downloads/{token}`: unauthenticated, single-use and valid for 1 h. It serves the zip.
+    - **Limits:** at most 100,000 files and 50 GiB per zip.
+    - **Escrow:** both routes need full escrow (`409 escrow_unavailable`). Every server unwrap is audited with purpose `download`.
+

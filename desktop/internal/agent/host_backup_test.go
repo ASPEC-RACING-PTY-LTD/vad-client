@@ -792,3 +792,11 @@ func TestEnrolmentSendsBoxPubAndPinsIdentity(t *testing.T) {
 	}
 	waitFor(t, "stack verified", func() bool { st, _ := h.bk.pin(); return st == PinStateVerified && h.bk.current() != nil })
 }
+
+func (f *fakeBackupServer) DeviceRestore(context.Context, int64) (*wire.DeviceRestore, error) {
+	return nil, errors.New("fake: no restores")
+}
+
+func (f *fakeBackupServer) ReportRestore(context.Context, int64, wire.RestoreProgress) (*wire.RestoreProgressReply, error) {
+	return &wire.RestoreProgressReply{}, nil
+}

@@ -133,3 +133,6 @@ What remains:
 ## Next
 
 Phase 2. MASTER_PLAN §18.4 says the master decomposes it at its start from §12/§13; about 16 tasks are expected. Work then continues per [the execution rules](planning/AGENT_BRIEF.md).
+
+## Phase 2 (Restore) — in progress (2026-10-18)
+Decomposed in planning/PHASE2_TASKS.md. Core restore is implemented across sdk, desktop (executor, agent task, `vaultdock-restore` CLI) and vad-server (routes, downloads, web Restore page). The local in-app restore API, the desktop Restore screen, e2e and full verification remain; see D:/VaultDock/remains.md.

@@ -151,6 +151,11 @@ type Restore struct {
 	BytesDone        int64  `json:"bytes_done"`
 	CreatedAt        int64  `json:"created_at"`
 	UpdatedAt        int64  `json:"updated_at"`
+	// Rev 1.1c additions.
+	ConflictPolicy  string `json:"conflict_policy,omitempty"`
+	CancelRequested bool   `json:"cancel_requested,omitempty"`
+	Error           string `json:"error,omitempty"`
+	FinishedAt      *int64 `json:"finished_at,omitempty"`
 }
 
 // RestoreItem is one item result (GET /restore/{id}/items?status=); for e2e
@@ -161,4 +166,57 @@ type RestoreItem struct {
 	Action     string `json:"action"`
 	Status     string `json:"status"`
 	Message    string `json:"message,omitempty"`
+	Size       int64  `json:"size,omitempty"`
+}
+
+// Restore item statuses (rev 1.1c §14). blocked marks an item refused by
+// system-file protection (§10.3); it is never retried.
+const (
+	RestoreItemPending = "pending"
+	RestoreItemDone    = "done"
+	RestoreItemSkipped = "skipped"
+	RestoreItemFailed  = "failed"
+	RestoreItemBlocked = "blocked"
+)
+
+// RestoreProgressItemsMax bounds the items of one progress report.
+const RestoreProgressItemsMax = 1000
+
+// DeviceRestore is the reply of GET /device/restores/{id} (dev, rev 1.1c):
+// what the target device needs to run an approved restore. Mappings are the
+// plan's token mappings; an auto mapping with an empty To is resolved by the
+// device for TargetProfileSID. Overrides map a source token path prefix to
+// an absolute target folder and win over token mappings.
+type DeviceRestore struct {
+	Restore          Restore              `json:"restore"`
+	RepoID           int64                `json:"repo_id"`
+	RepoUUID         string               `json:"repo_uuid"`
+	SnapshotOID      string               `json:"snapshot_oid"`
+	Selection        []RestoreSelection   `json:"selection"`
+	Mappings         []RestorePlanMapping `json:"mappings"`
+	Overrides        []RestorePathMapping `json:"overrides"`
+	TargetProfileSID string               `json:"target_profile_sid"`
+	ConflictPolicy   string               `json:"conflict_policy"`
+	CancelRequested  bool                 `json:"cancel_requested"`
+}
+
+// RestoreProgress is the body of POST /device/restores/{id}/progress (dev,
+// rev 1.1c). Status is running or a terminal status (completed, partial,
+// failed, cancelled); after a terminal report the restore is final. Items
+// (at most RestoreProgressItemsMax per report) are appended.
+type RestoreProgress struct {
+	Status     string        `json:"status"`
+	FilesTotal int64         `json:"files_total"`
+	FilesDone  int64         `json:"files_done"`
+	BytesTotal int64         `json:"bytes_total"`
+	BytesDone  int64         `json:"bytes_done"`
+	Error      string        `json:"error,omitempty"`
+	Items      []RestoreItem `json:"items,omitempty"`
+}
+
+// RestoreProgressReply answers a progress report. CancelRequested tells the
+// device to stop and report cancelled.
+type RestoreProgressReply struct {
+	Status          string `json:"status"`
+	CancelRequested bool   `json:"cancel_requested"`
 }

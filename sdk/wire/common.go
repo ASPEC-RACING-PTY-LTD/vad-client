@@ -33,6 +33,7 @@ const (
 	CodeBackupQuotaExceeded       = "backup_quota_exceeded"
 	CodePlanStale                 = "plan_stale"
 	CodeConflict                  = "conflict"
+	CodeCatalogPending            = "catalog_pending" // rev 1.1c
 	CodeDeviceCannotDelete        = "device_cannot_delete"
 	CodeTaskNotClaimable          = "task_not_claimable"
 	CodeRepoNotFound              = "repo_not_found"
@@ -64,6 +65,7 @@ const (
 	FeatureDestinations = "destinations.v1"
 	FeatureAI           = "ai.v1"
 	FeatureDeployEnv    = "deploy_env.v1"
+	FeatureRestore      = "restore.v1" // rev 1.1c
 )
 
 // List limits for ?cursor=&limit= (api-v1 §1).

@@ -153,3 +153,13 @@ func (r *Repo) VerifySnapshot(root *snapshot.Root, stored []byte) error {
 	}
 	return snapshot.VerifyRoot(stored, pub)
 }
+
+// BlobSize returns the plaintext length of a blob from the index, without
+// reading it (restore uses it to seek inside files).
+func (r *Repo) BlobSize(id pack.BlobID) (int64, bool) {
+	loc, ok := r.index.Lookup(id)
+	if !ok {
+		return 0, false
+	}
+	return int64(loc.Entry.RawLength), true
+}
