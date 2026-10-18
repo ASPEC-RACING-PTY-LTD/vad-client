@@ -20,7 +20,8 @@ export function apiMessage(e: unknown): string {
   const err = apiError(e)
   switch (err.code) {
     case 'forbidden':
-      return 'This needs a Windows administrator. Open VaultDock as an administrator, or ask one to do this step.'
+      window.dispatchEvent(new Event('vaultdock:needs-admin'))
+      return 'This needs a Windows administrator. Restart VaultDock as administrator, or ask one to do this step.'
     case 'sik_mismatch':
       return "The server's identity has changed. Backups are stopped until an administrator checks it."
     case 'identity_unpinned':

@@ -17,6 +17,7 @@ import { ReadinessScreen } from './screens/Readiness'
 import { ModeScreen } from './screens/Mode'
 import { enabledModules, modeLabel, screenVisible, type ScreenId } from './modules/registry'
 import { useMode } from './modules/useMode'
+import { AdminBanner } from './admin'
 import logo from './logo.png'
 
 type Tab = ScreenId
@@ -157,6 +158,15 @@ export function App() {
           </div>
         </header>
         <main className="scroll-thin min-h-0 flex-1 overflow-y-auto px-6 py-6">
+          <AdminBanner />
+          {keys && !keys.available && (
+            <div role="status" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm dark:border-amber-700 dark:bg-amber-500/10">
+              <strong>Backups are unavailable on this PC.</strong>{' '}
+              {keys.error === 'backup is not available in this agent'
+                ? 'VaultDock is not connected to its background service. Restart the PC; if this stays, reinstall VaultDock.'
+                : keys.error || 'The backup service could not start.'}
+            </div>
+          )}
           {current === 'readiness' && <ReadinessScreen onSetup={() => setForceSetup(true)} goto={setTab} />}
           {current === 'backups' && (
             <BackupsScreen

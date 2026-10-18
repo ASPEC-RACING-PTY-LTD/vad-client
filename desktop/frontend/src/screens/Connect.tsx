@@ -5,6 +5,7 @@ import { CancelEnrollment, Connect, ProbeServer } from '../../wailsjs/go/main/Ap
 import type { agent } from '../../wailsjs/go/models'
 import { Button, Field } from '../ui'
 import { errMsg } from '../lib'
+import { RestartAsAdminButton, isAdminRequired } from '../admin'
 import logo from '../logo.png'
 
 type Step = 'server' | 'trust' | 'credentials' | 'pending' | 'result'
@@ -234,5 +235,15 @@ export function ConnectScreen({ boot, revoked, onDone }: { boot: agent.Bootstrap
 }
 
 function ErrorBox({ msg }: { msg: string }) {
+  if (isAdminRequired(msg)) {
+    return (
+      <div className="flex flex-col gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
+        <span>Connecting this PC to a server is a machine-wide change, so it needs administrator rights.</span>
+        <div>
+          <RestartAsAdminButton />
+        </div>
+      </div>
+    )
+  }
   return <div className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">{msg}</div>
 }

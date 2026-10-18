@@ -868,6 +868,20 @@ export namespace main {
 	        this.user = source["user"];
 	    }
 	}
+	export class Elevation {
+	    admin: boolean;
+	    elevated: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new Elevation(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.admin = source["admin"];
+	        this.elevated = source["elevated"];
+	    }
+	}
 	export class KnownFolder {
 	    token: string;
 	    path: string;

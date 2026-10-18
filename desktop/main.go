@@ -42,6 +42,9 @@ func main() {
 		_ = wails.Run(&options.App{Title: "VaultDock", Bind: []interface{}{&App{}}})
 		return
 	}
+	// An elevated restart (App.RestartAsAdmin) waits for the old window to
+	// exit so the single-instance lock does not hand it back to that one.
+	waitForParent(os.Args[1:])
 	if err := os.MkdirAll(platform.DataDir(), 0o700); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

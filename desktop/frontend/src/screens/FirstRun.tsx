@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { CheckCircle2, KeyRound, ShieldCheck, ShieldAlert, UserCheck, Database } from 'lucide-react'
 import { ConfirmRecoveryKey, ConfirmServerIdentity, GetConsentStatus, GiveProfileConsent, InitRepository, KeyStatus } from '../../wailsjs/go/main/App'
 import type { agent, main } from '../../wailsjs/go/models'
-import { Badge, Button, Field, cx, useUI } from '../ui'
+import { Badge, Button, CopyButton, Field, cx, useUI } from '../ui'
 import { apiMessage } from '../api'
 import { ModeInfo } from './Mode'
 import logo from '../logo.png'
@@ -38,7 +38,6 @@ const stepList: { id: Step; label: string }[] = [
   { id: 'identity', label: 'Server identity' },
   { id: 'repository', label: 'Backup storage' },
   { id: 'recovery', label: 'Recovery key' },
-  { id: 'confirm', label: 'Confirm key' },
   { id: 'consent', label: 'Your profile' },
 ]
 
@@ -72,10 +71,11 @@ export function FirstRun({ initial, onDone, onSkip }: { initial: agent.KeyStatus
         </div>
         <ol className="mb-5 flex flex-wrap gap-2" aria-label="Setup steps">
           {stepList.map((s, i) => {
-            const cur = stepList.findIndex((x) => x.id === step)
+            const shown = step === 'confirm' ? 'recovery' : step // confirm only appears for an unfinished earlier setup
+            const cur = stepList.findIndex((x) => x.id === shown)
             const done = step === 'done' || i < cur
             return (
-              <li key={s.id} aria-current={s.id === step ? 'step' : undefined} className={cx('rounded-full px-3 py-1 text-xs font-medium', s.id === step ? 'bg-brand-600 text-white' : done ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' : 'bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400')}>
+              <li key={s.id} aria-current={s.id === shown ? 'step' : undefined} className={cx('rounded-full px-3 py-1 text-xs font-medium', s.id === shown ? 'bg-brand-600 text-white' : done ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' : 'bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400')}>
                 {i + 1}. {s.label}
               </li>
             )
@@ -96,7 +96,8 @@ export function FirstRun({ initial, onDone, onSkip }: { initial: agent.KeyStatus
               text={recoveryKey}
               onNext={() => {
                 setShownBefore(true)
-                setStep('confirm')
+                setRecoveryKey('')
+                setStep('consent')
               }}
             />
           )}
@@ -247,24 +248,47 @@ function RepositoryStep({ onCreated }: { onCreated: (recoveryKey: string) => voi
 
 function RecoveryShowStep({ text, onNext }: { text: string; onNext: () => void }) {
   const [saved, setSaved] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  // Next finalises the storage with the key shown here (no retyping step).
+  const next = async () => {
+    setBusy(true)
+    setError('')
+    try {
+      await ConfirmRecoveryKey(text)
+      onNext()
+    } catch (e) {
+      setError(apiMessage(e))
+    } finally {
+      setBusy(false)
+    }
+  }
   return (
     <div>
       <div className="mb-4 flex items-center gap-3">
         <KeyRound className="size-7 text-amber-600" />
-        <h2 className="text-lg font-semibold">Write down your recovery key</h2>
+        <h2 className="text-lg font-semibold">Save your recovery key</h2>
       </div>
       <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">
-        This key restores your backups even if the server is lost. It is shown <strong>only once</strong> and VaultDock does not keep a copy. Write it on paper or store it in a password manager, away from this PC.
+        This key restores your backups even if the server is lost. It is shown <strong>only once</strong> and VaultDock does not keep a copy. Store it in a password manager or on paper, away from this PC.
       </p>
       <div className="rounded-xl border-2 border-dashed border-amber-400 bg-amber-50 p-4 font-mono text-base tracking-wide break-all select-text dark:bg-amber-500/10" data-testid="recovery-key">
         {text}
       </div>
+      <div className="mt-2 flex justify-end">
+        <CopyButton text={text} label="Copy recovery key" />
+      </div>
       <label className="mt-4 flex items-start gap-2 text-sm">
         <input type="checkbox" className="mt-0.5" checked={saved} onChange={(e) => setSaved(e.target.checked)} />
-        <span>I have written down the recovery key and stored it safely.</span>
+        <span>I have saved the recovery key somewhere safe.</span>
       </label>
+      {error && (
+        <p role="alert" className="mt-3 text-sm text-rose-600">
+          {error}
+        </p>
+      )}
       <div className="mt-6 flex justify-end">
-        <Button variant="primary" disabled={!saved} onClick={onNext}>
+        <Button variant="primary" disabled={!saved} loading={busy} onClick={next}>
           Next
         </Button>
       </div>
@@ -303,8 +327,8 @@ function RecoveryConfirmStep({ justShown, onConfirmed }: { justShown: boolean; o
       <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">
         {justShown ? 'Type the recovery key from your copy to check it was written down correctly.' : 'Your backup storage was set up on this PC but the recovery key was never confirmed. Type the recovery key you saved.'}
       </p>
-      <Field label="Recovery key" hint="Type it in; pasting is disabled so the check proves your copy is right.">
-        <textarea className="input font-mono" rows={3} autoComplete="off" spellCheck={false} value={text} onChange={(e) => setText(e.target.value)} onPaste={(e) => e.preventDefault()} placeholder="VDRK1-…" />
+      <Field label="Recovery key" hint="Paste or type the recovery key you saved.">
+        <textarea className="input font-mono" rows={3} autoComplete="off" spellCheck={false} value={text} onChange={(e) => setText(e.target.value)} placeholder="VDRK1-…" />
       </Field>
       {error && (
         <p role="alert" className="mt-3 text-sm text-rose-600">

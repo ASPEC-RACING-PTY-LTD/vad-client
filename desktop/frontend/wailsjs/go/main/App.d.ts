@@ -77,6 +77,10 @@ export function PreviewConfig(arg1:config.SyncConfig):Promise<agent.PreviewResul
 
 export function ProbeServer(arg1:agent.ProbeRequest):Promise<agent.ProbeResult>;
 
+export function Elevation():Promise<main.Elevation>;
+
+export function RestartAsAdmin():Promise<void>;
+
 export function Quit():Promise<void>;
 
 export function Readiness():Promise<agent.BackupReadiness>;

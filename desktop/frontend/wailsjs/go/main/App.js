@@ -142,6 +142,14 @@ export function ProbeServer(arg1) {
   return window['go']['main']['App']['ProbeServer'](arg1);
 }
 
+export function Elevation() {
+  return window['go']['main']['App']['Elevation']();
+}
+
+export function RestartAsAdmin() {
+  return window['go']['main']['App']['RestartAsAdmin']();
+}
+
 export function Quit() {
   return window['go']['main']['App']['Quit']();
 }
