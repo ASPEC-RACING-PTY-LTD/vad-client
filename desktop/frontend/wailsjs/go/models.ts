@@ -522,6 +522,7 @@ export namespace config {
 	    files?: string[];
 	    destination: string;
 	    recursive: boolean;
+	    compress?: boolean;
 	    include_subfolders?: string[];
 	    exclude_subfolders?: string[];
 	    include_extensions?: string[];
@@ -556,6 +557,7 @@ export namespace config {
 	        this.files = source["files"];
 	        this.destination = source["destination"];
 	        this.recursive = source["recursive"];
+	        this.compress = source["compress"];
 	        this.include_subfolders = source["include_subfolders"];
 	        this.exclude_subfolders = source["exclude_subfolders"];
 	        this.include_extensions = source["include_extensions"];
@@ -643,6 +645,7 @@ export namespace engine {
 	    files?: string[];
 	    destination: string;
 	    recursive: boolean;
+	    compress?: boolean;
 	    include_subfolders?: string[];
 	    exclude_subfolders?: string[];
 	    include_extensions?: string[];
@@ -684,6 +687,7 @@ export namespace engine {
 	        this.files = source["files"];
 	        this.destination = source["destination"];
 	        this.recursive = source["recursive"];
+	        this.compress = source["compress"];
 	        this.include_subfolders = source["include_subfolders"];
 	        this.exclude_subfolders = source["exclude_subfolders"];
 	        this.include_extensions = source["include_extensions"];

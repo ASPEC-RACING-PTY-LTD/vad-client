@@ -290,7 +290,7 @@ func (e *Engine) process(at *activeTransfer) {
 		return
 	}
 
-	res, err := e.xfer.Upload(ctx, c, client.UploadRequest{Path: it.RemotePath(), Size: size, SHA256: sum, ModifiedAt: fi.ModTime().UnixMilli(), Tags: it.Tags, OnConflict: cfg.OnConflict}, f, transfer.Progress{Sent: &at.sent, Phase: func(p string) { at.phase.Store(p) }})
+	res, err := e.xfer.Upload(ctx, c, client.UploadRequest{Path: it.RemotePath(), Size: size, SHA256: sum, ModifiedAt: fi.ModTime().UnixMilli(), Tags: it.Tags, OnConflict: cfg.OnConflict}, f, transfer.Progress{Sent: &at.sent, Phase: func(p string) { at.phase.Store(p) }, Compress: cfg.Compress})
 	if err != nil {
 		var se *transfer.StageError
 		if !errors.As(err, &se) {

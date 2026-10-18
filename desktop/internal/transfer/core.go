@@ -42,6 +42,10 @@ type Progress struct {
 	Sent *atomic.Int64
 	// Phase is called with "uploading" and "finalizing".
 	Phase func(string)
+	// Compress sends chunks zstd-compressed where that saves bytes
+	// (upload.zstd). A server without support is detected on the first
+	// refused chunk and the rest go raw.
+	Compress bool
 }
 
 func (p Progress) phase(s string) {
@@ -55,6 +59,7 @@ type Core struct {
 	ctrl    *Controller
 	limiter Limiter
 	hashSem chan struct{}
+	noZstd  atomic.Bool // the server refused a compressed chunk (no upload.zstd)
 }
 
 // New returns a core with an automatic maximum of maxParallel parallel
@@ -139,7 +144,7 @@ func (c *Core) Upload(ctx context.Context, cl *client.Client, req client.UploadR
 	if p.Sent != nil {
 		p.Sent.Store(up.BytesReceived)
 	}
-	if err := c.UploadChunks(ctx, cl, up, r, p.Sent); err != nil {
+	if err := c.uploadChunks(ctx, cl, up, r, p.Sent, p.Compress); err != nil {
 		return nil, &StageError{Stage: "upload", Err: err}
 	}
 	p.phase("finalizing")
@@ -154,6 +159,10 @@ func (c *Core) Upload(ctx context.Context, cl *client.Client, req client.UploadR
 // with bounded per-file parallelism under the global adaptive concurrency.
 // sent (optional) receives byte progress.
 func (c *Core) UploadChunks(ctx context.Context, cl *client.Client, up *client.UploadSession, r io.ReaderAt, sent *atomic.Int64) error {
+	return c.uploadChunks(ctx, cl, up, r, sent, false)
+}
+
+func (c *Core) uploadChunks(ctx context.Context, cl *client.Client, up *client.UploadSession, r io.ReaderAt, sent *atomic.Int64, compress bool) error {
 	missing := up.Missing()
 	if len(missing) == 0 {
 		return nil
@@ -181,7 +190,7 @@ func (c *Core) UploadChunks(ctx context.Context, cl *client.Client, up *client.U
 				if ctx.Err() != nil {
 					return
 				}
-				if err := c.sendChunk(ctx, cl, up, r, idx, sent); err != nil {
+				if err := c.sendChunk(ctx, cl, up, r, idx, sent, compress); err != nil {
 					errOnce.Do(func() { firstErr = err })
 					cancel()
 					return
@@ -209,7 +218,7 @@ func (p progressReaderAt) ReadAt(b []byte, off int64) (int, error) {
 	return n, err
 }
 
-func (c *Core) sendChunk(ctx context.Context, cl *client.Client, up *client.UploadSession, r io.ReaderAt, idx int64, sent *atomic.Int64) error {
+func (c *Core) sendChunk(ctx context.Context, cl *client.Client, up *client.UploadSession, r io.ReaderAt, idx int64, sent *atomic.Int64, compress bool) error {
 	off, n := idx*up.ChunkSize, up.ChunkLen(idx)
 	sum, err := client.HashSection(r, off, n)
 	if err != nil {
@@ -221,7 +230,23 @@ func (c *Core) sendChunk(ctx context.Context, cl *client.Client, up *client.Uplo
 		}
 		var local atomic.Int64
 		start := time.Now()
-		err := cl.PutChunkHashed(ctx, up.ID, idx, progressReaderAt{r: r, total: sent, local: &local}, off, n, sum)
+		var err error
+		zipped := false
+		if compress && !c.noZstd.Load() {
+			zipped, err = cl.PutChunkCompressed(ctx, up.ID, idx, r, off, n, sum)
+			if zipped && err != nil && unsupportedEncoding(err) {
+				// A server without upload.zstd: send this and later chunks raw.
+				c.noZstd.Store(true)
+				zipped, err = false, nil
+			}
+			if zipped && err == nil {
+				local.Store(n) // progress counts raw bytes
+				sent.Add(n)
+			}
+		}
+		if !zipped {
+			err = cl.PutChunkHashed(ctx, up.ID, idx, progressReaderAt{r: r, total: sent, local: &local}, off, n, sum)
+		}
 		lat := time.Since(start)
 		var ok int64
 		if err == nil {
@@ -247,4 +272,11 @@ func (c *Core) sendChunk(ctx context.Context, cl *client.Client, up *client.Uplo
 		case <-time.After(wait):
 		}
 	}
+}
+
+// unsupportedEncoding: a server without upload.zstd rejects a compressed
+// chunk by its length (400 bad_length) or the encoding (415).
+func unsupportedEncoding(err error) bool {
+	var ae *client.APIError
+	return errors.As(err, &ae) && (ae.Status == 415 || (ae.Status == 400 && ae.Code == "bad_length"))
 }

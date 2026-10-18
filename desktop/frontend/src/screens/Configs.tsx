@@ -363,6 +363,15 @@ function Editor({ initial, onClose, onSaved }: { initial: Cfg | null; onClose: (
         </section>
 
         <section>
+          <Toggle
+            checked={!!c.compress}
+            onChange={(v) => set({ compress: v })}
+            label="Compress uploads"
+            description="Compresses files before sending them, which uploads documents, code and other compressible files faster on slow connections. Photos, video and archives are sent as they are. Files are stored the same either way."
+          />
+        </section>
+
+        <section>
           <div className="label">Automations</div>
           <select className="input mb-3 sm:w-80" value={c.automation_mode} onChange={(e) => set({ automation_mode: e.target.value })}>
             <option value="all">Apply all my enabled automations</option>

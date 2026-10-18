@@ -31,6 +31,10 @@ type SyncConfig struct {
 	// Destination is the folder in VaultDock storage, e.g. "/Medal".
 	Destination string `json:"destination"`
 	Recursive   bool   `json:"recursive"`
+	// Compress sends uploads zstd-compressed when the server supports it
+	// (upload.zstd): faster on slow links for compressible files, no gain
+	// for photos, video or archives. Files are stored the same either way.
+	Compress bool `json:"compress,omitempty"`
 	// IncludeSubfolders restricts recursion to these relative folders
 	// (empty means all); ExcludeSubfolders always wins.
 	IncludeSubfolders []string `json:"include_subfolders,omitempty"`
