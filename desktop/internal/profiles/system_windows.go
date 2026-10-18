@@ -10,7 +10,7 @@ import (
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/tokens"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/tokens"
 )
 
 const profileListKey = `SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList`

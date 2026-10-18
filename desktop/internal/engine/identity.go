@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/config"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/tokens"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/config"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/tokens"
 )
 
 // Owner identity (MASTER_PLAN §7.8, C7). In the agent service the engine

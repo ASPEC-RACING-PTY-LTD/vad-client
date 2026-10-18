@@ -16,7 +16,7 @@ Rewrite the pre-split `.github/workflows/{ci,release}.yml` for the client reposi
   - `desktop` (windows): builds the installer as before.
     - When `WINDOWS_CERT_PFX` is set, the `HAS_CERT` job env is computed from `secrets.WINDOWS_CERT_PFX != ''`. The step signs `VaultDock.exe` via `scripts/sign.ps1`, re-runs `makensis -DARG_WAILS_AMD64_BINARY=<signed exe> project.nsi` so the installer contains the signed binary, then signs the installer.
     - Otherwise it emits a `::notice::` and the build stays unsigned.
-  - `publish` (ubuntu): guarded by `github.repository == 'ASPEC-RACING-PTY-LTD/VaultDock'`.
+  - `publish` (ubuntu): guarded by `github.repository == 'ASPEC-RACING-PTY-LTD/vad-client'`.
     - Writes the placeholder component manifest `components-<v>.json` as `{"manifest_version":1,"release":"<v>","components":[]}`. It is valid per `sdk/modules`.
     - If `RELEASE_MANIFEST_KEY` is set, it writes a detached `components-<v>.json.sig`: a base64 Ed25519 signature over the exact file bytes, made with `openssl pkeyutl -rawin` and verified in-step. The key goes to a 0600 temp file that is removed on exit, and only the public key is printed.
     - Then it writes `SHA256SUMS` over all assets and creates or updates the GitHub release (`--prerelease` for `-` tags).

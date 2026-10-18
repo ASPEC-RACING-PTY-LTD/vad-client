@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/automation"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/pathutil"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/automation"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/pathutil"
 )
 
 // SyncConfig describes one selection of local files to synchronise.

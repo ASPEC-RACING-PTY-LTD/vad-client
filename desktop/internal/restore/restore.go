@@ -28,12 +28,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/guard"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/tokens"
-	sdkrestore "github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/restore"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/snapshot"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/vdcrypt"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/guard"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/tokens"
+	sdkrestore "github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/restore"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/snapshot"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/vdcrypt"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
 
 // Source is an opened repository (*repo.Repo implements it).

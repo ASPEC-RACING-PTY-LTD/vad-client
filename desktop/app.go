@@ -12,15 +12,15 @@ import (
 
 	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/agent"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/config"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/engine"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/platform"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/agent"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/config"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/engine"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/platform"
 )
 
 // UpdateRepo is the GitHub repository checked for new releases
 // ("owner/name"). Override at build time; empty disables checks.
-var UpdateRepo = "ASPEC-RACING-PTY-LTD/VaultDock"
+var UpdateRepo = "ASPEC-RACING-PTY-LTD/vad-client"
 
 // App is bound to the frontend. It keeps only UI-session concerns (dialogs,
 // windows, the tray, opening folders and URLs) and forwards everything else

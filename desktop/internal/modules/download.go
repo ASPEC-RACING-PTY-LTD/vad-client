@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	sdkmod "github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/modules"
+	sdkmod "github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/modules"
 )
 
 // ErrDownloadUnavailable means the component pipeline cannot install yet;

@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/outbox"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/client"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/outbox"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/client"
 )
 
 // Version is the desktop client version reported to the server.

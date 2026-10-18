@@ -6,8 +6,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/guard"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/snapshot"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/guard"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/snapshot"
 )
 
 // OSFolders resolves known folders as the Windows defaults below the

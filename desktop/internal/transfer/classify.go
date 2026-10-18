@@ -7,7 +7,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/client"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/client"
 )
 
 // MaxAttempts is the number of times a queued transfer is tried before it is

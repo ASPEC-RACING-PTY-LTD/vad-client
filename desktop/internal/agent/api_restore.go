@@ -1,6 +1,6 @@
 package agent
 
-import "github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+import "github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 
 // --- restore (DSK-G, Phase 2) ---
 

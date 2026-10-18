@@ -5,11 +5,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/backup"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/guard"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/restore"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/tokens"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/backup"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/guard"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/restore"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/tokens"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
 
 // restoreJobs builds the runner of server-requested restores (api-v1 rev

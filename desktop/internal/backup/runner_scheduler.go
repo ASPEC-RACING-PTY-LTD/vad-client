@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/scheduler"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/schedule"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/scheduler"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/schedule"
 )
 
 // SchedulerJobs is the scheduler's job source (scheduler.Config.Source):

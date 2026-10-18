@@ -9,9 +9,9 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/modules"
-	sdkmod "github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/modules"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/modules"
+	sdkmod "github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/modules"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
 
 // ItemKindBackupJob is modules.AffectedItem.Kind for a backup job.

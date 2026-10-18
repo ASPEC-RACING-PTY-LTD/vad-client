@@ -30,7 +30,7 @@ All files are in the client repo `VaultDock` and were created by this task.
 
 ## Interfaces exposed (exact Go/TS signatures, routes, schema others depend on)
 ```go
-package agent // github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/agent
+package agent // github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/agent
 
 const ProtocolVersion = 1
 

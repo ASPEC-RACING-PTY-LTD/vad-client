@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/agent"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/ipc/caller"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/agent"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/ipc/caller"
 )
 
 // ServerOptions configures a Server. Zero values select the defaults.

@@ -57,7 +57,7 @@ All files are in the client repo `VaultDock`, and all were created by this task.
 
 ## Interfaces exposed (exact Go/TS signatures, routes, schema others depend on)
 ```go
-package service // github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/service
+package service // github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/service
 
 const DefaultName = "VaultDockAgent"; DefaultDisplayName = "VaultDock Agent"; DefaultDescription
 const DefaultStopTimeout = 30 * time.Second

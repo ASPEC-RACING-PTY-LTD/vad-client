@@ -16,7 +16,7 @@ Package `sdk/pack` implementing backup-format-v1 (rev 1.2) §7.1–§7.3: blob i
 
 There are no binary fixtures (§13 does not ask for them) and no new dependencies.
 
-## Interfaces exposed (package `github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/pack`)
+## Interfaces exposed (package `github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/pack`)
 ```go
 type Class uint8;    const ClassData, ClassMeta Class = 0, 1
 type BlobType uint8; const TypeData, TypeTree, TypeMeta BlobType = 0, 1, 2

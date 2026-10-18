@@ -5,9 +5,9 @@ import (
 
 	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/agent"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/config"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/platform"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/agent"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/config"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/platform"
 )
 
 // --- bootstrap and connection (agent) ---

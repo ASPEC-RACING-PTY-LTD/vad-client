@@ -18,7 +18,7 @@ Implement `sdk/vdcrypt` per backup-format-v1 rev 1.1 §3–§4, §12: subkeys, t
 
 No new dependencies: the package uses stdlib (`crypto/hkdf`, `crypto/ed25519`, `crypto/sha256`) plus `golang.org/x/crypto` {chacha20poly1305, curve25519, argon2}, which is already in go.mod.
 
-## Interfaces exposed (package `github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/vdcrypt`)
+## Interfaces exposed (package `github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/vdcrypt`)
 Every `rnd io.Reader` parameter means crypto/rand when nil.
 ```go
 const KeySize = 32

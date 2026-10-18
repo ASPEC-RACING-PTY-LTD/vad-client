@@ -5,8 +5,8 @@ import (
 	"os/user"
 	"strconv"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/agent"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/profiles"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/agent"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/profiles"
 )
 
 // --- first-run wizard (agent) ---

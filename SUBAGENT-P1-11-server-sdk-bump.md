@@ -5,7 +5,7 @@ Status: completed
 Make the server consume the SDK version that contains `repo`.
 
 ## Changes
-None needed. `vad-server/go.mod` uses the temporary `replace github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk => ../VaultDock/sdk`, and `D:/VaultDock/go.work` points at the same checkout, so the server already builds against the current SDK, including `sdk/repo`. INT runs `go mod tidy` in the final audit.
+None needed. `vad-server/go.mod` uses the temporary `replace github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk => ../VaultDock/sdk`, and `D:/VaultDock/go.work` points at the same checkout, so the server already builds against the current SDK, including `sdk/repo`. INT runs `go mod tidy` in the final audit.
 
 ## Notes for dependent tasks / INT
 - P1-12 and P1-14 may import `sdk/vdcrypt`, `sdk/repo`, `sdk/pack` and `sdk/snapshot` directly.

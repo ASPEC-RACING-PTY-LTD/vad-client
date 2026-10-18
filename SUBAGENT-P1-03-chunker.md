@@ -12,7 +12,7 @@ Implement `sdk/chunker` per backup-format-v1 rev 1.1 §9: normalised FastCDC wit
 
 No new dependencies: stdlib + `vdcrypt` (+ `vdcrypt/vdcrypttest` in tests only).
 
-## Interfaces exposed (package `github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/chunker`)
+## Interfaces exposed (package `github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/chunker`)
 ```go
 const Name = "vd-fastcdc-1"
 const MinSize = 512 << 10; AvgSize = 1 << 20; MaxSize = 8 << 20

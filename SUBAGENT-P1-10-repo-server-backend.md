@@ -24,7 +24,7 @@ Add `sdk/repo/backend/server`, a `repo.Backend` over `*client.Client` for one se
 
 ## Interfaces exposed
 ```go
-package server // github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/repo/backend/server
+package server // github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/repo/backend/server
 
 type Options struct {
     MaxRetries int           // retries on 503/429; default 4, <0 disables

@@ -6,8 +6,8 @@ import (
 	"net"
 	"unicode/utf8"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/client"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/client"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
 
 // maxIssueDetail bounds the detail text sent with an issue.

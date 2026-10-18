@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/schedule"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/schedule"
 )
 
 // fakeClock is a manual clock. After registers a waiter that fires when

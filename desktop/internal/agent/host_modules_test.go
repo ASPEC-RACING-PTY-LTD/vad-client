@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/config"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/modules"
-	sdkmod "github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/modules"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/config"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/modules"
+	sdkmod "github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/modules"
 )
 
 func TestHostStartCreatesModuleManager(t *testing.T) {

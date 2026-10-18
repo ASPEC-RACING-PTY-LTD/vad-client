@@ -30,7 +30,7 @@ Package `sdk/repo` per backup-format-v1 rev 1.2 §2, §4, §5, §7.4, §10–§1
 
 No new dependencies. The package uses stdlib plus `sdk/{vdcrypt,compress,chunker,pack,snapshot}`.
 
-## Interfaces exposed (`github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/repo`)
+## Interfaces exposed (`github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/repo`)
 ```go
 // backend
 type Kind string // KindConfig KindKeys KindChain KindIndex KindSnapshots KindData KindLocks (= api-v1 kinds); Valid()

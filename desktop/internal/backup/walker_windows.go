@@ -12,7 +12,7 @@ import (
 
 	"golang.org/x/sys/windows"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/snapshot"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/snapshot"
 )
 
 // OSFS is the real FS. Listings use FindFirstFile, so attributes and the

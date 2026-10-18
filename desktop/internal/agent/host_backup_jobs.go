@@ -10,15 +10,15 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/backup"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/config"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/guard"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/ipc/caller"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/modules"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/profiles"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/client"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/snapshot"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/backup"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/config"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/guard"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/ipc/caller"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/modules"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/profiles"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/client"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/snapshot"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
 
 // Limits of SaveBackupJob and SkipIssues (the server enforces its own).

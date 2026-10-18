@@ -18,9 +18,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/platform"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/repo"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/vdcrypt"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/platform"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/repo"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/vdcrypt"
 )
 
 // File names inside Options.Dir.

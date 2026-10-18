@@ -10,11 +10,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/agent"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/backup"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/guard"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/snapshot"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/agent"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/backup"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/guard"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/snapshot"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
 
 // uiError turns an agent error into one whose message is the JSON

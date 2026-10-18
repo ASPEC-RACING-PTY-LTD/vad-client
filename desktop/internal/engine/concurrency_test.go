@@ -3,7 +3,7 @@ package engine
 import (
 	"testing"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/config"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/config"
 )
 
 // The controller's behaviour is tested in internal/transfer; this checks the

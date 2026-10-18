@@ -14,7 +14,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/release"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/release"
 )
 
 // fakeGitHub serves the releases API and asset downloads in-process. The

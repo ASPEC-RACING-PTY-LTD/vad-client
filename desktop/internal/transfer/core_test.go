@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/client"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/client"
 )
 
 // fakeServer implements the upload session endpoints the core uses.

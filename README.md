@@ -5,7 +5,7 @@ The Windows client of VaultDock, a self-hosted backup, file storage and synchron
 - **Windows desktop app**: tray app and Windows service that back up the folders you select, browse and restore older versions, and (in Advanced mode) sync folders, run automations, discover and reinstall apps, and back up app settings.
 - **Resumable, verified transfers**: background uploads with adaptively parallel chunk transfers.
 - **Secure by design**: device approval, Ed25519 per-device keys protected with Windows DPAPI, signed and replay-protected requests. Backups are encrypted on the PC before upload.
-- **SDK** (`sdk/`, Go module `github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk`): automation engine, API client, request signing, wire types and the backup format, shared with the server.
+- **SDK** (`sdk/`, Go module `github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk`): automation engine, API client, request signing, wire types and the backup format, shared with the server.
 
 ## Install the server first
 
@@ -38,7 +38,7 @@ The password is used once to request access and is never stored. Revoking a devi
 
 ## Updates and releases
 
-- The desktop app updates itself from the GitHub releases of `ASPEC-RACING-PTY-LTD/VaultDock`. Installers are verified against their published SHA-256 checksum.
+- The desktop app updates itself from the GitHub releases of `ASPEC-RACING-PTY-LTD/vad-client`. Installers are verified against their published SHA-256 checksum.
 - Push a `vX.Y.Z` tag and the Release workflow publishes the Windows installer, the component manifest `components-<version>.json` (with a detached Ed25519 signature when `RELEASE_MANIFEST_KEY` is set) and `SHA256SUMS`. The installer and app are Authenticode-signed when `WINDOWS_CERT_PFX` (and `WINDOWS_CERT_PASSWORD`) are set.
 
 ## Documentation

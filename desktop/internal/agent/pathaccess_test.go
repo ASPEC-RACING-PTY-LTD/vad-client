@@ -8,11 +8,11 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/config"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/guard"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/ipc/caller"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/profiles"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/tokens"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/config"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/guard"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/ipc/caller"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/profiles"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/tokens"
 )
 
 const testUserSID = "S-1-5-21-1111111111-2222222222-3333333333-1001"

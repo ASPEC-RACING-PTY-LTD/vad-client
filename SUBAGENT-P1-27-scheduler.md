@@ -15,7 +15,7 @@ All in the VaultDock client repo, all created:
 
 ## Interfaces exposed
 ```go
-package scheduler // github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/scheduler
+package scheduler // github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/scheduler
 
 const Trigger = wire.RunTriggerSchedule // "schedule"
 const DefaultMaxSleep = 15 * time.Minute; DefaultRetry = time.Minute

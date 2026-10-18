@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/modules"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/modules"
 )
 
 func TestPrivilegesForMode(t *testing.T) {

@@ -1,6 +1,6 @@
 package engine
 
-import "github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/transfer"
+import "github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/transfer"
 
 // The adaptive concurrency controller now lives in internal/transfer; these
 // aliases keep the engine's existing names working.

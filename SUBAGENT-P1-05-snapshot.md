@@ -29,7 +29,7 @@ Package `sdk/snapshot` per backup-format-v1 rev 1.2 §3, §6, §8, §12 and §13
 
 No new dependencies. The package uses stdlib, `sdk/vdcrypt` and `sdk/compress`.
 
-## Interfaces exposed (`github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/snapshot`)
+## Interfaces exposed (`github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/snapshot`)
 ```go
 // JCS
 func Canonicalize(data []byte) ([]byte, error)

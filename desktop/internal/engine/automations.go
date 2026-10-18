@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/config"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/automation"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/client"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/config"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/automation"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/client"
 )
 
 // Guards against automation loops (sync.completed -> start task -> ...).

@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/ipc/caller"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/ipc/caller"
 )
 
 // CodeForbidden is the stable error code for calls the caller may not make.

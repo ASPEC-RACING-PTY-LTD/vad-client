@@ -38,7 +38,7 @@ Uninstalling asks whether to remove these; your own files and everything on the 
 
 ## Updates
 
-The app keeps itself up to date from the GitHub releases of `ASPEC-RACING-PTY-LTD/VaultDock` (override at build time with `-X main.UpdateRepo=owner/name`; an empty value disables updates).
+The app keeps itself up to date from the GitHub releases of `ASPEC-RACING-PTY-LTD/vad-client` (override at build time with `-X main.UpdateRepo=owner/name`; an empty value disables updates).
 
 - It checks two minutes after start and then every six hours. **Settings → Updates → Check now** checks immediately.
 - A newer installer is downloaded only over HTTPS from `github.com` (redirects are limited to GitHub's asset hosts), into `%LOCALAPPDATA%\VaultDock\updates`.
@@ -50,7 +50,7 @@ Development builds (version `dev`) never update themselves.
 
 ## Publishing a release
 
-Push a version tag in this repository (`ASPEC-RACING-PTY-LTD/VaultDock`). The **Release** workflow builds the Windows installer, then publishes the GitHub release with the component manifest and `SHA256SUMS`. Signing is optional and driven by repository secrets: `WINDOWS_CERT_PFX` (base64 .pfx) and `WINDOWS_CERT_PASSWORD` for Authenticode, `RELEASE_MANIFEST_KEY` (Ed25519 PEM) for the component manifest signature.
+Push a version tag in this repository (`ASPEC-RACING-PTY-LTD/vad-client`). The **Release** workflow builds the Windows installer, then publishes the GitHub release with the component manifest and `SHA256SUMS`. Signing is optional and driven by repository secrets: `WINDOWS_CERT_PFX` (base64 .pfx) and `WINDOWS_CERT_PASSWORD` for Authenticode, `RELEASE_MANIFEST_KEY` (Ed25519 PEM) for the component manifest signature.
 
 ```bash
 ch tag v1.2.0

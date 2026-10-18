@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/state"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/state"
 )
 
 type sent struct{ kind, key, body string }

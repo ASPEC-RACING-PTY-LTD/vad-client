@@ -4,8 +4,8 @@ import (
 	"context"
 	"sync"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/pack"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/repo"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/pack"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/repo"
 )
 
 // dedupIndex answers "is this blob already stored or queued?" for one run:

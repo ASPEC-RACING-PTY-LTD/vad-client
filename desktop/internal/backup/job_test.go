@@ -7,9 +7,9 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/modules"
-	sdkmod "github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/modules"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/modules"
+	sdkmod "github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/modules"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
 
 func wj(id, rev int64, name string, mods ...string) wire.Job {

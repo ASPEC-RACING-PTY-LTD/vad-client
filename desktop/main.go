@@ -20,11 +20,11 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/windows"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/agent"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/config"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/engine"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/ipc"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/platform"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/agent"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/config"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/engine"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/ipc"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/platform"
 )
 
 //go:embed all:frontend/dist

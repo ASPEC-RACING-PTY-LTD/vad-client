@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/state"
-	sdkmod "github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/modules"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/state"
+	sdkmod "github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/modules"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
 
 // fakeSource keeps items in memory; deleting is impossible by construction,

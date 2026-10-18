@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/repo"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/repo"
 )
 
 // DefaultSpoolMax bounds the bytes of sealed packs waiting in the spool

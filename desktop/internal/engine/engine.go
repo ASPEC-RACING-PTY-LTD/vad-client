@@ -19,13 +19,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/config"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/filter"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/outbox"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/state"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/transfer"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/automation"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/client"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/config"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/filter"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/outbox"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/state"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/transfer"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/automation"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/client"
 )
 
 // Notifier shows a desktop notification.

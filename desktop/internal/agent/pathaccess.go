@@ -7,11 +7,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/config"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/guard"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/ipc/caller"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/profiles"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/tokens"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/config"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/guard"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/ipc/caller"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/profiles"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/tokens"
 )
 
 // CodeAccessDenied is the error code for a caller-supplied path the caller

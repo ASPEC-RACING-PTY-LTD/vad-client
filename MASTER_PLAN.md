@@ -1,6 +1,6 @@
 # VaultDock Backup, Recovery & Storage: Master Plan
 
-Status: **implementation authorised 2026-10-18** (owner green light; open questions Q1–Q18 accepted at their recommendations). Phase S done (local commits only). Plan revision **r3** (2026-10-18). Baseline: `main` @ `10af74f` (single repository `D:/VaultDock/VaultDock`, origin = Codehold `git.aspecracing.com.au/aspec-racing-pty-ltd/vaultdock`).
+Status: **implementation authorised 2026-10-18** (owner green light; open questions Q1–Q18 accepted at their recommendations). Phase S done (local commits only). Plan revision **r3** (2026-10-18). Baseline: `main` @ `10af74f` (single repository `D:/VaultDock/VaultDock`, origin = Codehold `git.aspecracing.com.au/aspec-racing-pty-ltd/vad-client`).
 
 r3 incorporates the owner's binding decisions O1–O9, the deployment requirements DR1–DR8 and the install-mode requirement R11 (§2). Conflicts these create are listed explicitly in §4 and are **not** silently resolved.
 
@@ -138,7 +138,7 @@ Original requirements 1–10 ([planning/REQUIREMENTS.md](planning/REQUIREMENTS.m
 |---|---|---|
 | D1 | Backup data in a separate repository, never in `nodes`/`blobs` | kept |
 | D2 | Own repository format from small permissive libraries (zstd BSD-3, x/crypto BSD-3); the chunker is specified in the contract | kept |
-| D3 | Shared code lives in the **SDK module `VaultDock/sdk`** (Go module `github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk`), used by `vad-server` and the Windows client. Server-only code (objstore, retention, catalog, keys custody, GC, scheduler) lives in `vad-server/internal` | **changed** (O9) |
+| D3 | Shared code lives in the **SDK module `VaultDock/sdk`** (Go module `github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk`), used by `vad-server` and the Windows client. Server-only code (objstore, retention, catalog, keys custody, GC, scheduler) lives in `vad-server/internal` | **changed** (O9) |
 | D4 | Storage backends are **server-side only**: `vad-server/internal/objstore` with `localfs` (incl. host-mounted SMB/NAS) and `s3` (AWS, R2, B2, MinIO). Devices always upload through the server | **changed** (O9) |
 | D5 | Sync blob storage stays on `internal/storage` (not migrated to objstore) | kept |
 | D6 | Pack upload = one signed, streamed PUT per pack (target 16 MiB, max 64 MiB) | kept |
@@ -195,7 +195,7 @@ Removed from r2: D9's "managed-metadata plaintext listing", the per-user install
 | C18 | R11 Simple mode without VSS | Locked files (e.g. Outlook PST) are skipped in Simple mode | Readiness shows the "locked files skipped" issue class with a one-click "Enable snapshot support" that installs only the `vss` component (staying in Simple mode) | Confirm VSS as an optional add-on in Simple (Q14) |
 | C19 | DR5 admin-UI env removal vs a container that cannot edit host files | The server container (read-only root FS) cannot edit the host `.env` | The admin UI records approvals into the state volume (`deploy/env-removal-approvals.json`); `install.sh upgrade` applies them on the host | — |
 | C20 | DR2 vs the existing `caddy` Compose profile | Current installs using `COMPOSE_PROFILES=caddy` rely on a bundled proxy container | The default Compose drops Caddy. `install.sh upgrade` detects the old profile and moves it to the opt-in `deploy/integrations/caddy/compose.caddy.yml` override **with the same volumes**, so no data or certificates are lost | — |
-| C21 | O9 split vs existing server installs | Installed servers auto-update from `ASPEC-RACING-PTY-LTD/VaultDock` releases and download `install.sh` from that repo | A transitional release from the `VaultDock` repo ships an `install.sh` that switches its source to `vad-server`. The old repo keeps publishing a tiny `install.sh` **redirect stub** for 2 release cycles. That stub is deployment glue, not server implementation | Approve the stub (Q15) |
+| C21 | O9 split vs existing server installs | Installed servers auto-update from `ASPEC-RACING-PTY-LTD/vad-client` releases and download `install.sh` from that repo | A transitional release from the `VaultDock` repo ships an `install.sh` that switches its source to `vad-server`. The old repo keeps publishing a tiny `install.sh` **redirect stub** for 2 release cycles. That stub is deployment glue, not server implementation | Approve the stub (Q15) |
 | C22 | O9 "no server source in client project" vs git history | Old commits in `VaultDock` contain server source | History is preserved (no rewrite), because rewriting breaks every clone and the Codehold→GitHub mirror. If the owner wants server code purged from client history before the public release, a one-time rewrite before first publication is possible | Choose (Q16) |
 | C23 | O9 SDK in the client repo vs server builds | `vad-server` depends on a module hosted inside the client repo; Docker builds need it | The SDK is versioned with `sdk/vX.Y.Z` tags and fetched via the Go module proxy from the public GitHub mirror (or `GOPRIVATE` from Codehold). Local development uses an untracked `D:/VaultDock/go.work` | Confirm the module path host: GitHub vs Codehold (Q17) |
 | C24 | DR3 cloudflared detection vs remotely managed tunnels | Tunnels created in the Cloudflare dashboard (token-based) cannot have ingress edited locally | `install.sh` detects systemd/Docker cloudflared. For a locally managed config it adds or validates the ingress rule (backup first, then `cloudflared tunnel ingress validate`, then reload, with rollback). For token tunnels it prints exact dashboard steps and verifies reachability afterwards | — |
@@ -309,7 +309,7 @@ Unchanged from r2. Summary:
    - Remove the origin remote; the owner creates the Codehold repo later.
    - `git-filter-repo` is an external tool run by INT (MIT-licensed tool, not incorporated). Its use needs owner approval (Q1).
 3. **Move shared code into the SDK** (in `VaultDock`):
-   - `git mv pkg sdk/<pkgs>`, `go mod init github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk`.
+   - `git mv pkg sdk/<pkgs>`, `go mod init github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk`.
    - Rewrite imports in `sdk/` and `desktop/`.
    - Desktop `replace` → `../sdk`.
 4. **Remove server paths from `VaultDock`** (one commit). Move `sdk/contracts` → `sdk/contracts`.
@@ -337,7 +337,7 @@ Unchanged from r2. Summary:
    - the desktop updater keeps checking `VaultDock` releases.
 
 **Codehold and GitHub (DR7):**
-- Codehold is `origin` for both repositories and mirrors pushes to public GitHub (`ASPEC-RACING-PTY-LTD/VaultDock` and `ASPEC-RACING-PTY-LTD/vad-server`).
+- Codehold is `origin` for both repositories and mirrors pushes to public GitHub (`ASPEC-RACING-PTY-LTD/vad-client` and `ASPEC-RACING-PTY-LTD/vad-server`).
 - CI and releases run on GitHub Actions (public runners) from the mirrored tags:
   - the server image goes to GHCR;
   - the Windows installer, components, the restore tool, `SHA256SUMS` and the component manifest go to GitHub Releases.

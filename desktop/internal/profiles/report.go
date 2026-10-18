@@ -4,7 +4,7 @@ import (
 	"context"
 	"sort"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
 
 // ReportSender sends PUT /device/profiles (injected; the agent's device

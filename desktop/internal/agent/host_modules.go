@@ -3,9 +3,9 @@ package agent
 import (
 	"path/filepath"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/engine"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/modules"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/client"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/engine"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/modules"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/client"
 )
 
 // KindModules carries modules.ModulesState whenever the install mode,

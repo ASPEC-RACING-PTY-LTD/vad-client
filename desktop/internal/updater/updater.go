@@ -20,8 +20,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/release"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/version"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/release"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/version"
 )
 
 // InstallerPattern matches the Windows installer attached to each release.

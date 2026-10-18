@@ -167,7 +167,7 @@ Not used anywhere: VSS, `SeBackupPrivilege`, `BackupRead`, `SHGetKnownFolderPath
 
 ### 1.9 Updater (`internal/updater`, tested)
 
-- Polls GitHub Releases for `ASPEC-RACING-PTY-LTD/VaultDock` (`app.go:32`): the first check after 2 min, then every 6 h (`app_update.go:18-22`).
+- Polls GitHub Releases for `ASPEC-RACING-PTY-LTD/vad-client` (`app.go:32`): the first check after 2 min, then every 6 h (`app_update.go:18-22`).
 - Asset regex `^VaultDock-<ver>-amd64-setup\.exe$` (`updater.go:28`).
 - Download only from trusted github.com URLs, verified against SHA-256 from the release (`SHA256SUMS`, produced at `release.yml:252-254`). The checksum is checked again before install (`updater.go:274-293`).
 - Runs `setup.exe /S /RELAUNCH /D=<dir>` detached after the app has shut down (`updater.go:297-305`, `app_update.go:132-150`). The installer kills the running exe (`project.nsi:57-61`) and relaunches it with `--updated` (`project.nsi:78-82`).

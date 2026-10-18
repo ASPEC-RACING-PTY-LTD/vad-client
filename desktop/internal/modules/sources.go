@@ -10,8 +10,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/config"
-	sdkmod "github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/modules"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/config"
+	sdkmod "github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/modules"
 )
 
 // RegisterSource adds an ItemSource (backup jobs, sync folders, automations,

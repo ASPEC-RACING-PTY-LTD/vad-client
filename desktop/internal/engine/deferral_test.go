@@ -17,10 +17,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/config"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/filter"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/state"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/client"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/config"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/filter"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/state"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/client"
 )
 
 func deferralEngine(t *testing.T, dbPath string) (*Engine, *state.Store) {

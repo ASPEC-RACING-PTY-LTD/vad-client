@@ -1,19 +1,19 @@
 // Test-only module: end-to-end tests of the desktop engine against a real
 // vad-server. It needs a sibling checkout at ../../../vad-server and is never
 // built into the shipped client.
-module github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/e2e
+module github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/e2e
 
 go 1.26.0
 
 replace (
-	github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop => ../
-	github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk => ../../sdk
+	github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop => ../
+	github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk => ../../sdk
 	github.com/ASPEC-RACING-PTY-LTD/vad-server => ../../../vad-server
 )
 
 require (
-	github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop v0.0.0-00010101000000-000000000000
-	github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk v0.0.0-00010101000000-000000000000
+	github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop v0.0.0-00010101000000-000000000000
+	github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk v0.0.0-00010101000000-000000000000
 	github.com/ASPEC-RACING-PTY-LTD/vad-server v0.0.0-00010101000000-000000000000
 )
 

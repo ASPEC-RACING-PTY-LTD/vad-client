@@ -7,9 +7,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/state"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/transfer"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/client"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/state"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/transfer"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/client"
 )
 
 func (e *Engine) dispatchLoop() {

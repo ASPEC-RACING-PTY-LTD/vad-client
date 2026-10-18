@@ -26,12 +26,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/guard"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/restore"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/repo"
-	sdkrestore "github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/restore"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/snapshot"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/guard"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/restore"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/repo"
+	sdkrestore "github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/restore"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/snapshot"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
 
 func main() {

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/dbutil"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/dbutil"
 )
 
 var newTables = []string{"issues", "outbox", "schedule_last", "install_mode", "modules", "profiles", "sync_base"}

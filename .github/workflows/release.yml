@@ -1,7 +1,7 @@
 name: Release
 
 # Push a tag such as v1.2.0 to publish a client release to GitHub Releases of
-# ASPEC-RACING-PTY-LTD/VaultDock. The desktop updater picks it up from there.
+# ASPEC-RACING-PTY-LTD/vad-client. The desktop updater picks it up from there.
 # The server image and install.sh are released from ASPEC-RACING-PTY-LTD/vad-server.
 #
 # Optional secrets (each step is skipped with a notice when its secret is unset):
@@ -135,7 +135,7 @@ jobs:
     name: Publish release
     needs: [desktop]
     # Only the official repository publishes; forks and mirrors do not.
-    if: github.repository == 'ASPEC-RACING-PTY-LTD/VaultDock'
+    if: github.repository == 'ASPEC-RACING-PTY-LTD/vad-client'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

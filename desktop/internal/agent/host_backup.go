@@ -12,15 +12,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/backup"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/keystore"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/platform"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/profiles"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/scheduler"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/client"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/repo"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/repo/backend/server"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/backup"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/keystore"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/platform"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/profiles"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/scheduler"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/client"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/repo"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/repo/backend/server"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
 
 // BackupOptions enables the backup stack in the Host (MASTER_PLAN §7.9,

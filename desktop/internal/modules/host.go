@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"log/slog"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/client"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/client"
 )
 
 // NewForHost builds the Manager the agent Host owns, in one call:

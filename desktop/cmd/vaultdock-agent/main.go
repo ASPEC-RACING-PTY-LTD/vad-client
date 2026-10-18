@@ -25,17 +25,17 @@ import (
 	"time"
 	_ "time/tzdata" // backup schedules name IANA zones; Windows has no zoneinfo
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/agent"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/engine"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/service"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/modules"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/agent"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/engine"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/service"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/modules"
 )
 
 // version is set at build time with -ldflags "-X main.version=x.y.z".
 var version = "0.1.0"
 
 // updateRepo is the release repository for agent self-updates (ldflags).
-var updateRepo = "ASPEC-RACING-PTY-LTD/VaultDock"
+var updateRepo = "ASPEC-RACING-PTY-LTD/vad-client"
 
 // IPCServeFunc serves the agent API to UI clients until ctx is cancelled.
 // It must return promptly after cancellation.

@@ -118,7 +118,7 @@ DEP task for B15, B16 and C20 (DR2, DR4, DR5, DR6):
   - An *old* install.sh run against these new files would download a missing `deploy/Caddyfile` (it fails safe, before swapping). Or, if a stub file is provided, it would run `--remove-orphans` and drop Caddy until the next new-script run.
   - So the stub must download the vad-server `install.sh` and `exec` it for upgrades, rather than run the old upgrade logic against new files.
 - **P0-33:**
-  - `REPO` default is still `ASPEC-RACING-PTY-LTD/VaultDock` (the repo URL transition is not part of this task).
+  - `REPO` default is still `ASPEC-RACING-PTY-LTD/vad-client` (the repo URL transition is not part of this task).
   - Keep `RUNTIME_FILES` in sync with `managed-files.json`.
   - Reuse `env_*`, `json_records` and `integration_*`.
   - Never reintroduce an overwriting setter.

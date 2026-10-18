@@ -14,7 +14,7 @@ import (
 	"github.com/Microsoft/go-winio"
 	"golang.org/x/sys/windows"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/agent"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/agent"
 )
 
 func testPipeName(t *testing.T) string {

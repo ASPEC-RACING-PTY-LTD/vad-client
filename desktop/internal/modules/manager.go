@@ -22,8 +22,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	sdkmod "github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/modules"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	sdkmod "github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/modules"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
 
 // State is the local state of a module. It is a superset of the wire states

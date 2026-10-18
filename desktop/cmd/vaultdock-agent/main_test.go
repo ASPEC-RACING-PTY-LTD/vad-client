@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/service"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/modules"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/service"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/modules"
 )
 
 func TestParseArgs(t *testing.T) {

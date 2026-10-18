@@ -10,8 +10,8 @@ import (
 
 	"golang.org/x/sys/windows"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/tokens"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/tokens"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
 
 func selfSID(t *testing.T) string {

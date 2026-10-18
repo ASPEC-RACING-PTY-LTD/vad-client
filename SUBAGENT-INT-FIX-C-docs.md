@@ -37,7 +37,7 @@ None. The image name was checked against `vad-server/.github/workflows/release.y
 ## Commands run and results
 - Mode texts: an awk line-length check (max 74), a CR count (0) and a non-ASCII grep (none). `wc -w` as above.
 - After the edits, a grep of the in-scope `*.md` for `pkg/` and for `WINDOWS_SIGNING_CERT` finds nothing.
-- The remaining `ASPEC-RACING-PTY-LTD/VaultDock` mentions are correct (client repo or SDK module).
+- The remaining `ASPEC-RACING-PTY-LTD/vad-client` mentions are correct (client repo or SDK module).
 - No code, workflow, `SUBAGENT-*`, `sdk/contracts/**` or `planning/**` files were touched. No git commands other than `git status`.
 
 ## Contract issues

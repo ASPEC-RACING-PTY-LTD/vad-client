@@ -1,6 +1,6 @@
 package main
 
-import "github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/updater"
+import "github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/updater"
 
 // Updates run in the agent (internal/agent/updates.go); these bindings
 // forward to it.

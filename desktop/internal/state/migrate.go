@@ -3,7 +3,7 @@ package state
 import (
 	"database/sql"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/dbutil"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/dbutil"
 )
 
 // legacyTables are the tables of the pre-migration schema (now migration 1).

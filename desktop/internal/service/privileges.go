@@ -3,7 +3,7 @@ package service
 import (
 	"fmt"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/modules"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/modules"
 )
 
 // Privilege names accepted in the SCM RequiredPrivileges allowlist.

@@ -8,10 +8,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/agent"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/modules"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/platform"
-	sdkmod "github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/modules"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/agent"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/modules"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/platform"
+	sdkmod "github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/modules"
 )
 
 // modeTextFS holds the install-mode info texts (P1-31). They are the single

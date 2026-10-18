@@ -4,7 +4,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/tokens"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/tokens"
 )
 
 // Opener opens a file the walker emitted for reading as the profile's

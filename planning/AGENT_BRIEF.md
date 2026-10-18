@@ -6,7 +6,7 @@ You are one sub-agent implementing **one task** of `D:/VaultDock/VaultDock/MASTE
 
 | Repo | Path | Go module |
 |---|---|---|
-| Client | `D:/VaultDock/VaultDock` | `sdk/` = `github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk`; `desktop/` = `github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop`; `desktop/e2e/` = test-only module (desktop engine vs real server) |
+| Client | `D:/VaultDock/VaultDock` | `sdk/` = `github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk`; `desktop/` = `github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop`; `desktop/e2e/` = test-only module (desktop engine vs real server) |
 | Server | `D:/VaultDock/vad-server` | `github.com/ASPEC-RACING-PTY-LTD/vad-server` (React web app in `web/`) |
 
 - `D:/VaultDock/go.work` (untracked) ties the modules together; Go commands run inside any module directory use it automatically.

@@ -20,7 +20,7 @@ All in the client repo `VaultDock`:
 
 ## Interfaces exposed (exact Go/TS signatures, routes, schema others depend on)
 ```go
-package transfer // github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/transfer
+package transfer // github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/transfer
 
 const AbsoluteMax = 128
 const MaxChunkParallelPerFile = 4

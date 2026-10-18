@@ -22,7 +22,7 @@ DEP follow-up to P0-32 (DR1–DR6, C21, C24, §7.13):
 - Backward compatibility:
   - `build_image` tries the legacy image of the same version (`legacy_release_image`) when the vad-server image cannot be pulled. It does this only for the default repo, a release version, and when `VAULTDOCK_IMAGE` is unset.
   - An existing `VAULTDOCK_IMAGE=ghcr.io/.../vaultdock:x` in `.env` stays valid for rollback.
-  - An existing `VAULTDOCK_UPDATE_REPO=ASPEC-RACING-PTY-LTD/VaultDock` is **not** changed, because it is a user value. The upgrade warns and says how to change it.
+  - An existing `VAULTDOCK_UPDATE_REPO=ASPEC-RACING-PTY-LTD/vad-client` is **not** changed, because it is a user value. The upgrade warns and says how to change it.
 
 **Managed files**
 - `runtime_files DIR` builds the file list from the `replace`/`keep-modified` entries of `managed-files.json`, dropping unsafe paths. `RUNTIME_FILES` is only the fallback, and the harness checks that the two stay in sync.
@@ -162,7 +162,7 @@ DEP follow-up to P0-32 (DR1–DR6, C21, C24, §7.13):
 - **Docs** (not owned): update the old repo and image names.
   - `docs/desktop.md:60` still names `ghcr.io/aspec-racing-pty-ltd/vaultdock`; the vad-server package must be made public.
   - `README.md`/`docs/deployment.md` should show the vad-server `curl` URL, `install.sh integrations cloudflared` and the KEK backup.
-- **C21 stub:** the old repo's stub must `exec` this `install.sh`. Old installs keep `VAULTDOCK_UPDATE_REPO=ASPEC-RACING-PTY-LTD/VaultDock` in `.env`, and `install.sh` only warns about it. If INT wants an automatic change, it needs an explicit owner decision, because of DR4.
+- **C21 stub:** the old repo's stub must `exec` this `install.sh`. Old installs keep `VAULTDOCK_UPDATE_REPO=ASPEC-RACING-PTY-LTD/vad-client` in `.env`, and `install.sh` only warns about it. If INT wants an automatic change, it needs an explicit owner decision, because of DR4.
 - **Server (config/escrow owner):**
   - `install.sh` creates the KEK with the container uid. The server should **refuse to start** rather than create a new KEK when sealed keys exist and the file is missing.
   - A `vaultdock kek-check` CLI command would help (see Gaps).

@@ -16,7 +16,7 @@ The desktop job is removed.
 
 **Sibling SDK checkout:**
 - Jobs that compile Go check out this repo to `$GITHUB_WORKSPACE/vad-server`.
-- A "Detect local SDK replace" step greps `go.mod` for `replace …/VaultDock/sdk => ../VaultDock/sdk`. Only when that replace is present does the job check out `ASPEC-RACING-PTY-LTD/VaultDock` (sparse `sdk/`) to `$GITHUB_WORKSPACE/VaultDock`.
+- A "Detect local SDK replace" step greps `go.mod` for `replace …/VaultDock/sdk => ../VaultDock/sdk`. Only when that replace is present does the job check out `ASPEC-RACING-PTY-LTD/vad-client` (sparse `sdk/`) to `$GITHUB_WORKSPACE/VaultDock`.
 - The ref is `vars.VAULTDOCK_SDK_REF`, defaulting to `main`.
 - The token is `secrets.VAULTDOCK_SDK_TOKEN`, falling back to `github.token`.
 - Once the replace is removed, the sibling checkout is skipped and the SDK comes from the proxy automatically.

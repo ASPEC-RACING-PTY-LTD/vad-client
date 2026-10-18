@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/dbutil"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/dbutil"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
 
 func openTestStore(t *testing.T) *Store {

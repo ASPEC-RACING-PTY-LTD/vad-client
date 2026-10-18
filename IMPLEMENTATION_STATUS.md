@@ -7,7 +7,7 @@ This file consolidates every `SUBAGENT-*.md` report in this folder. Each report 
 ## Layout
 
 - `D:/VaultDock/VaultDock` contains:
-  - `sdk/`: Go module `github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk`;
+  - `sdk/`: Go module `github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk`;
   - `desktop/`;
   - `desktop/e2e/`: a test-only module (the desktop engine against a real test server);
   - `install.sh`: the C21 redirect stub to vad-server.

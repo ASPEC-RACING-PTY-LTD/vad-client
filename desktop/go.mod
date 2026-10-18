@@ -1,12 +1,12 @@
-module github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop
+module github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop
 
 go 1.26.0
 
-replace github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk => ../sdk
+replace github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk => ../sdk
 
 require (
 	git.sr.ht/~jackmordaunt/go-toast/v2 v2.0.3
-	github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk v0.0.0-00010101000000-000000000000
+	github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk v0.0.0-00010101000000-000000000000
 	github.com/Microsoft/go-winio v0.6.4
 	github.com/energye/systray v1.0.3
 	github.com/rjeczalik/notify v0.9.3

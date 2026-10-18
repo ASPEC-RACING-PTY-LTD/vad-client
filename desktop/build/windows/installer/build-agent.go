@@ -27,7 +27,7 @@ import (
 	"strings"
 )
 
-const desktopModule = "module github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop"
+const desktopModule = "module github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop"
 
 var versionRE = regexp.MustCompile(`^[0-9A-Za-z][0-9A-Za-z.+-]{0,63}$`)
 

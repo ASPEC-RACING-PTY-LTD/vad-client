@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/tokens"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/tokens"
 )
 
 // ScopeProfile is the only consent scope today: "Allow VaultDock to protect
