@@ -62,7 +62,7 @@ export function ModeScreen({ mode }: { mode: main.ModeView | null }) {
       {mode?.source === 'mode_file' && <p className="mb-4 text-xs text-slate-500">Read from the installer's settings; the service has not reported its modules yet.</p>}
       {mode?.pending_request && (
         <div className="card mb-4 border-amber-300 p-4 text-sm">
-          An administrator asked to switch this PC to <strong>{mode.pending_request.target_mode}</strong> mode. A local administrator must confirm it.
+          An administrator asked to switch this PC to <strong>{mode.pending_request.target_mode}</strong> mode. To switch, run the VaultDock installer again and choose that mode.
         </div>
       )}
       <div className="card mb-6 p-5">

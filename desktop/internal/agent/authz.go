@@ -88,22 +88,25 @@ var methodAccess = map[string]Access{
 	"RevokeConsent":      AccessUser,
 
 	// Machine-wide: server connection and enrolment, machine settings,
-	// engine pause, updates, keys, mode and modules.
-	"ProbeServer":        AccessAdmin,
-	"Connect":            AccessAdmin,
-	"CancelEnrollment":   AccessAdmin,
-	"Disconnect":         AccessAdmin,
-	"SaveSettings":       AccessAdmin,
-	"SetPaused":          AccessAdmin,
-	"CheckForUpdates":    AccessAdmin,
-	"InstallUpdate":      AccessAdmin,
-	"ConfirmRecoveryKey": AccessAdmin,
+	// engine pause, updates, keys, mode and modules. Owner decision
+	// 2026-10-19: every feature works without Windows administrator rights;
+	// only (re)installing needs elevation, and the installer asks for it
+	// through UAC itself. File access still runs under each owner's token.
+	"ProbeServer":        AccessUser,
+	"Connect":            AccessUser,
+	"CancelEnrollment":   AccessUser,
+	"Disconnect":         AccessUser,
+	"SaveSettings":       AccessUser,
+	"SetPaused":          AccessUser,
+	"CheckForUpdates":    AccessUser,
+	"InstallUpdate":      AccessUser,
+	"ConfirmRecoveryKey": AccessUser,
 	// First-run key setup: the repository and the trusted server identity
 	// are machine-wide; InitRepository returns the recovery key once.
-	"InitRepository":        AccessAdmin,
-	"ConfirmServerIdentity": AccessAdmin,
-	"SetMode":               AccessAdmin,
-	"SetModule":             AccessAdmin,
+	"InitRepository":        AccessUser,
+	"ConfirmServerIdentity": AccessUser,
+	"SetMode":               AccessUser,
+	"SetModule":             AccessUser,
 }
 
 // MethodAccess returns the class of a wire method; AccessDenied if unknown.
@@ -160,7 +163,8 @@ func IsAdmin(c caller.Caller) bool {
 //   - SYSTEM may call everything.
 //   - Anonymous, network, service and malformed identities are refused.
 //   - Any interactive user may call AccessRead and AccessUser methods.
-//   - AccessAdmin methods need Admin && Elevated.
+//   - AccessAdmin methods need Admin && Elevated (none are currently
+//     classified AccessAdmin; the class is kept for future use).
 //   - Unknown methods are refused.
 //
 // Refusals are *Error with code CodeForbidden.

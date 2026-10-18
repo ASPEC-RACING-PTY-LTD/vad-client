@@ -198,13 +198,15 @@ func TestBackupMethodsOverPipe(t *testing.T) {
 	if _, err := c.ListIssues(ctx, agent.IssueQuery{JobID: 1}); errCode(err) != agent.CodeUnavailable {
 		t.Fatalf("ListIssues = %v", err)
 	}
-	if _, err := c.InitRepository(ctx, agent.InitRepositoryRequest{}); errCode(err) != agent.CodeForbidden {
+	// Key setup no longer needs an administrator; without a backup stack it
+	// is unavailable rather than forbidden.
+	if _, err := c.InitRepository(ctx, agent.InitRepositoryRequest{}); errCode(err) != agent.CodeUnavailable {
 		t.Fatalf("InitRepository = %v", err)
 	}
-	if err := c.ConfirmRecoveryKey(ctx, "VDRK1-x"); errCode(err) != agent.CodeForbidden {
+	if err := c.ConfirmRecoveryKey(ctx, "VDRK1-x"); errCode(err) != agent.CodeUnavailable {
 		t.Fatalf("ConfirmRecoveryKey = %v", err)
 	}
-	if _, err := c.ConfirmServerIdentity(ctx, "AAAA"); errCode(err) != agent.CodeForbidden {
+	if _, err := c.ConfirmServerIdentity(ctx, "AAAA"); errCode(err) != agent.CodeUnavailable {
 		t.Fatalf("ConfirmServerIdentity = %v", err)
 	}
 }
