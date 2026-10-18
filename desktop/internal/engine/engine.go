@@ -202,9 +202,15 @@ func (e *Engine) SetClient(c *client.Client, me *client.Me) {
 		e.xfer.Attach(c, serverMax)
 		e.netFailures = 0
 		e.offlineUntil = time.Time{}
+		// New credentials (reconnect after a revocation): the sticky
+		// "revoked" status no longer applies.
+		if e.status == "revoked" {
+			e.status, e.message = "", ""
+		}
 	}
 	e.mu.Unlock()
 	if c != nil {
+		e.refreshStatus()
 		go e.refreshAutomations()
 		e.kick()
 	}
