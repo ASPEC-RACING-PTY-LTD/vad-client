@@ -173,7 +173,11 @@ func (e *Engine) applySideEffects(cfg *config.SyncConfig, plan automation.Plan, 
 		}
 		show := e.notify && (n.Channel == "desktop" || n.Channel == "both")
 		e.mu.Unlock()
-		if show && e.Notifier != nil {
+		switch {
+		case !show:
+		case e.NotifyOwner != nil:
+			e.NotifyOwner(cfg.OwnerSID, n.Title, n.Message, n.Level)
+		case e.Notifier != nil:
 			e.Notifier(n.Title, n.Message, n.Level)
 		}
 	}
@@ -189,7 +193,9 @@ func (e *Engine) startTask(from *config.SyncConfig, name string, depth int) {
 	}
 	var target *config.SyncConfig
 	for _, c := range e.Configs() {
-		if strings.EqualFold(c.Name, name) {
+		// An automation only starts folders of the same owner: one user's
+		// rules never trigger reads of another user's folders.
+		if strings.EqualFold(c.Name, name) && strings.EqualFold(c.OwnerSID, from.OwnerSID) {
 			cc := c
 			target = &cc
 		}

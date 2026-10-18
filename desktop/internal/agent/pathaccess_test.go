@@ -212,12 +212,27 @@ func TestSaveConfigAndSyncNowCallerIdentity(t *testing.T) {
 	if v, _ := e.h.ListConfigs(context.Background()); len(v) != 0 {
 		t.Fatalf("denied config was saved: %+v", v)
 	}
-	// Saved in-process (the admin UI); a pipe user without access cannot
+	// Saved in-process for another user: the pipe user cannot see or
 	// trigger it.
-	saved, err := e.h.SaveConfig(context.Background(), e.cfg())
+	other := e.cfg()
+	other.Name, other.OwnerSID = "Other", "S-1-5-21-1111111111-2222222222-3333333333-1002"
+	foreign, err := e.h.SaveConfig(context.Background(), other)
 	if err != nil {
 		t.Fatal(err)
 	}
+	if err := e.h.SyncNow(userCtx(), foreign.ID); code(err) != CodeNotFound {
+		t.Fatalf("SyncNow(foreign) = %v", err)
+	}
+	// The user's own folder: refused while their token cannot read it.
+	e.toks.tok.deny = false
+	saved, err := e.h.SaveConfig(userCtx(), e.cfg())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved.OwnerSID != testUserSID {
+		t.Fatalf("owner = %q", saved.OwnerSID)
+	}
+	e.toks.tok.deny = true
 	if err := e.h.SyncNow(userCtx(), saved.ID); code(err) != CodeAccessDenied {
 		t.Fatalf("SyncNow(id) as denied user = %v", err)
 	}
@@ -233,7 +248,7 @@ func TestSaveConfigAndSyncNowCallerIdentity(t *testing.T) {
 	if err := e.h.SyncNow(userCtx(), saved.ID); err != nil {
 		t.Fatalf("SyncNow(id) as permitted user = %v", err)
 	}
-	if err := e.h.SyncNow(systemCtx(), saved.ID); err != nil {
+	if err := e.h.SyncNow(systemCtx(), foreign.ID); err != nil {
 		t.Fatalf("SyncNow as SYSTEM = %v", err)
 	}
 	if err := e.h.SyncNow(userCtx(), "missing"); code(err) != CodeNotFound {

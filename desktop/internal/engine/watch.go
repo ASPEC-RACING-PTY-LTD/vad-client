@@ -136,13 +136,18 @@ func (e *Engine) onPathChanged(cfgID, abs string) {
 	if rel == "" {
 		return
 	}
-	fi, err := os.Stat(abs)
+	var fi os.FileInfo
+	err := e.asOwner(cfg, func() error {
+		var serr error
+		fi, serr = os.Stat(abs)
+		return serr
+	})
 	if os.IsNotExist(err) {
 		e.pathRemoved(cfg.ID, rel)
 		return
 	}
 	if err != nil {
-		return
+		return // includes paths the owner cannot see: never act on SYSTEM's view
 	}
 	if fi.IsDir() {
 		// A folder appeared or was renamed: rescan to pick up its contents.
@@ -220,7 +225,8 @@ func (e *Engine) pathRemoved(cfgID, rel string) {
 			return
 		}
 		if cfg, _ := e.config(cfgID); cfg != nil {
-			if _, err := os.Stat(absPath(cfg, rel)); os.IsNotExist(err) {
+			err := e.asOwner(cfg, func() error { _, serr := os.Stat(absPath(cfg, rel)); return serr })
+			if os.IsNotExist(err) {
 				e.fileDeleted(cfg, rel)
 			}
 		}

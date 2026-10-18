@@ -221,7 +221,19 @@ func (e *Engine) process(at *activeTransfer) {
 		return
 	}
 	abs := absPath(cfg, it.RelPath)
-	fi, err := os.Stat(abs)
+	// Stat and open run as the configuration's owner; the open handle keeps
+	// the access granted to them, so hashing and uploading read through it
+	// without the token.
+	var fi os.FileInfo
+	err := e.asOwner(cfg, func() error {
+		var serr error
+		fi, serr = os.Stat(abs)
+		return serr
+	})
+	if IsOwnerError(err) {
+		_ = e.st.Defer(it.ID, time.Now().Add(time.Minute).UnixMilli(), ownerMessage(err))
+		return
+	}
 	if err != nil {
 		if os.IsNotExist(err) {
 			_ = e.st.Done(it.ID)
@@ -243,7 +255,16 @@ func (e *Engine) process(at *activeTransfer) {
 		_ = e.st.Defer(it.ID, time.Now().Add(stable-age+500*time.Millisecond).UnixMilli(), "waiting for the file to stop changing")
 		return
 	}
-	f, err := openForUpload(abs)
+	var f *os.File
+	err = e.asOwner(cfg, func() error {
+		var oerr error
+		f, oerr = openForUpload(abs)
+		return oerr
+	})
+	if IsOwnerError(err) {
+		_ = e.st.Defer(it.ID, time.Now().Add(time.Minute).UnixMilli(), ownerMessage(err))
+		return
+	}
 	if err != nil {
 		e.deferUnreadable(at, size, mtime, err)
 		return
@@ -258,7 +279,13 @@ func (e *Engine) process(at *activeTransfer) {
 		e.handleErr(at, err, "hash")
 		return
 	}
-	if fi2, err := os.Stat(abs); err != nil || fi2.Size() != size || fi2.ModTime().UnixNano() != mtime {
+	var fi2 os.FileInfo
+	err = e.asOwner(cfg, func() error {
+		var serr error
+		fi2, serr = os.Stat(abs)
+		return serr
+	})
+	if err != nil || fi2.Size() != size || fi2.ModTime().UnixNano() != mtime {
 		_ = e.st.Defer(it.ID, time.Now().Add(stable).UnixMilli(), "file changed while hashing; waiting")
 		return
 	}

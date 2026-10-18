@@ -322,13 +322,18 @@ func (s *Store) Fail(id int64, errMsg string) error {
 }
 
 // RetryFailed moves failed items back to pending (all when id is 0).
-func (s *Store) RetryFailed(id int64) (int64, error) {
+func (s *Store) RetryFailed(id int64) (int64, error) { return s.RetryFailedIn(id, nil) }
+
+// RetryFailedIn is RetryFailed limited to the configurations in only (nil
+// means all; an empty non-nil slice matches nothing).
+func (s *Store) RetryFailedIn(id int64, only []string) (int64, error) {
 	q := "UPDATE queue SET status = 'pending', attempts = 0, next_at = ?, error = '' WHERE status = 'failed'"
 	args := []any{now()}
 	if id > 0 {
 		q += " AND id = ?"
 		args = append(args, id)
 	}
+	q, args = inConfigs(q, args, only)
 	res, err := s.DB.Exec(q, args...)
 	if err != nil {
 		return 0, err
@@ -346,13 +351,17 @@ func (s *Store) RemoveQueued(configID, rel string) {
 }
 
 // Items lists queue items by status ("" = all).
-func (s *Store) Items(status string, limit int) ([]Item, error) {
-	q := "SELECT " + itemCols + " FROM queue"
+func (s *Store) Items(status string, limit int) ([]Item, error) { return s.ItemsIn(status, nil, limit) }
+
+// ItemsIn is Items limited to the configurations in only (see RetryFailedIn).
+func (s *Store) ItemsIn(status string, only []string, limit int) ([]Item, error) {
+	q := "SELECT " + itemCols + " FROM queue WHERE 1 = 1"
 	var args []any
 	if status != "" {
-		q += " WHERE status = ?"
+		q += " AND status = ?"
 		args = append(args, status)
 	}
+	q, args = inConfigs(q, args, only)
 	rows, err := s.DB.Query(q+" ORDER BY status = 'active' DESC, next_at, id LIMIT ?", append(args, limit)...)
 	if err != nil {
 		return nil, err
@@ -405,12 +414,19 @@ func (s *Store) AddHistory(h HistoryEntry) {
 }
 
 func (s *Store) History(status string, limit int) ([]HistoryEntry, error) {
-	q := "SELECT id, config_id, rel_path, remote_path, size, status, result, error, duration_ms, finished_at FROM history"
+	return s.HistoryIn(status, nil, limit)
+}
+
+// HistoryIn is History limited to the configurations in only (see
+// RetryFailedIn).
+func (s *Store) HistoryIn(status string, only []string, limit int) ([]HistoryEntry, error) {
+	q := "SELECT id, config_id, rel_path, remote_path, size, status, result, error, duration_ms, finished_at FROM history WHERE 1 = 1"
 	var args []any
 	if status != "" {
-		q += " WHERE status = ?"
+		q += " AND status = ?"
 		args = append(args, status)
 	}
+	q, args = inConfigs(q, args, only)
 	rows, err := s.DB.Query(q+" ORDER BY id DESC LIMIT ?", append(args, limit)...)
 	if err != nil {
 		return nil, err
@@ -494,4 +510,20 @@ func (s *Store) PutSyncBase(b SyncBase) error {
 func (s *Store) DeleteSyncBase(folderID, rel string) error {
 	_, err := s.DB.Exec("DELETE FROM sync_base WHERE folder_id = ? AND rel_path = ?", folderID, rel)
 	return err
+}
+
+// inConfigs appends "AND config_id IN (...)" for only; nil leaves q
+// unchanged and an empty slice matches nothing.
+func inConfigs(q string, args []any, only []string) (string, []any) {
+	if only == nil {
+		return q, args
+	}
+	if len(only) == 0 {
+		return q + " AND 0 = 1", args
+	}
+	q += " AND config_id IN (?" + strings.Repeat(", ?", len(only)-1) + ")"
+	for _, id := range only {
+		args = append(args, id)
+	}
+	return q, args
 }

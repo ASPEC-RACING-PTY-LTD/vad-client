@@ -516,6 +516,7 @@ export namespace config {
 	    id: string;
 	    name: string;
 	    enabled: boolean;
+	    owner_sid?: string;
 	    kind: string;
 	    local_path: string;
 	    files?: string[];
@@ -549,6 +550,7 @@ export namespace config {
 	        this.id = source["id"];
 	        this.name = source["name"];
 	        this.enabled = source["enabled"];
+	        this.owner_sid = source["owner_sid"];
 	        this.kind = source["kind"];
 	        this.local_path = source["local_path"];
 	        this.files = source["files"];
@@ -581,6 +583,7 @@ export namespace engine {
 	
 	export class ActiveView {
 	    id: number;
+	    config_id: string;
 	    config: string;
 	    path: string;
 	    remote: string;
@@ -598,6 +601,7 @@ export namespace engine {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
+	        this.config_id = source["config_id"];
 	        this.config = source["config"];
 	        this.path = source["path"];
 	        this.remote = source["remote"];
@@ -633,6 +637,7 @@ export namespace engine {
 	    id: string;
 	    name: string;
 	    enabled: boolean;
+	    owner_sid?: string;
 	    kind: string;
 	    local_path: string;
 	    files?: string[];
@@ -673,6 +678,7 @@ export namespace engine {
 	        this.id = source["id"];
 	        this.name = source["name"];
 	        this.enabled = source["enabled"];
+	        this.owner_sid = source["owner_sid"];
 	        this.kind = source["kind"];
 	        this.local_path = source["local_path"];
 	        this.files = source["files"];

@@ -17,6 +17,12 @@ type SyncConfig struct {
 	ID      string `json:"id"`
 	Name    string `json:"name"`
 	Enabled bool   `json:"enabled"`
+	// OwnerSID is the Windows user whose profile owns the configuration
+	// (MASTER_PLAN §7.8). In the agent service every scan, stat and file
+	// open runs with this user's token; a configuration without an owner
+	// is not synchronised there. Set by the agent from the caller, never
+	// taken from a pipe client.
+	OwnerSID string `json:"owner_sid,omitempty"`
 	// Kind is "folder" (a folder and optionally its subfolders) or "files"
 	// (an explicit list of individual files).
 	Kind      string   `json:"kind"`

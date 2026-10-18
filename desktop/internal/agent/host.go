@@ -271,8 +271,16 @@ func (h *Host) Start(ctx context.Context) error {
 
 	h.eng.OnRevoked = h.onRevoked
 	h.eng.Notifier = func(title, msg, level string) { h.notify(title, msg, level) }
+	h.eng.NotifyOwner = func(owner, title, msg, level string) {
+		_ = h.bus.Publish(KindNotification, Notification{Title: title, Message: msg, Level: level, OwnerSID: owner})
+	}
 	h.eng.ApplySettings(s)
 	h.eng.LoadCachedAutomations()
+	if h.serviceMode() {
+		// The service runs as SYSTEM: read every folder as its owner.
+		h.assignOwners()
+		h.eng.SetTokens(h.opts.Tokens)
+	}
 	if err := h.eng.Start(h.ctx); err != nil {
 		return fmt.Errorf("engine start: %w", err)
 	}
@@ -688,15 +696,30 @@ func (h *Host) ListConfigs(ctx context.Context) ([]engine.ConfigView, error) {
 	if err := h.live(); err != nil {
 		return nil, err
 	}
-	v := h.eng.ConfigViews()
-	if v == nil {
-		v = []engine.ConfigView{}
+	sc := h.scopeOf(ctx)
+	v := []engine.ConfigView{}
+	for _, c := range h.eng.ConfigViews() {
+		if sc.owns(c.SyncConfig) {
+			v = append(v, c)
+		}
 	}
 	return v, nil
 }
 
 func (h *Host) SaveConfig(ctx context.Context, c config.SyncConfig) (config.SyncConfig, error) {
 	if err := h.live(); err != nil {
+		return c, err
+	}
+	sc := h.scopeOf(ctx)
+	var prev *config.SyncConfig
+	if c.ID != "" {
+		p, err := h.visibleConfig(sc, c.ID)
+		if err != nil {
+			return c, err
+		}
+		prev = &p
+	}
+	if err := h.setOwner(sc, &c, prev); err != nil {
 		return c, err
 	}
 	if err := h.checkCallerPaths(ctx, c); err != nil {
@@ -717,6 +740,9 @@ func (h *Host) DeleteConfig(ctx context.Context, id string) error {
 	if id == "" {
 		return invalidf("missing configuration id")
 	}
+	if _, err := h.visibleConfig(h.scopeOf(ctx), id); err != nil {
+		return err
+	}
 	return h.eng.DeleteConfig(id)
 }
 
@@ -724,6 +750,10 @@ func (h *Host) SyncNow(ctx context.Context, id string) error {
 	if err := h.live(); err != nil {
 		return err
 	}
+	// A caller triggers only folders they own, and (defence in depth) only
+	// those guard and their own token still allow; the scan itself reads as
+	// the folder's owner (engine.SetTokens).
+	sc := h.scopeOf(ctx)
 	pa, err := h.callerAccess(ctx)
 	if err != nil {
 		return err
@@ -732,10 +762,9 @@ func (h *Host) SyncNow(ctx context.Context, id string) error {
 	var ids []string
 	if id == "" {
 		for _, c := range h.eng.Configs() {
-			if !c.Enabled {
+			if !c.Enabled || !sc.owns(c) {
 				continue
 			}
-			// A pipe caller only triggers folders they can read.
 			if err := pa.check(c); err != nil {
 				h.log.Warn("sync now: skipping folder the caller cannot access", "config", c.ID, "err", err)
 				continue
@@ -743,16 +772,11 @@ func (h *Host) SyncNow(ctx context.Context, id string) error {
 			ids = append(ids, c.ID)
 		}
 	} else {
-		var cfg *config.SyncConfig
-		for _, c := range h.eng.Configs() {
-			if c.ID == id {
-				cfg = &c
-			}
+		c, err := h.visibleConfig(sc, id)
+		if err != nil {
+			return err
 		}
-		if cfg == nil {
-			return &Error{Code: CodeNotFound, Message: "no such configuration"}
-		}
-		if err := pa.check(*cfg); err != nil {
+		if err := pa.check(c); err != nil {
 			return err
 		}
 		ids = []string{id}
@@ -772,18 +796,21 @@ func (h *Host) PreviewConfig(ctx context.Context, c config.SyncConfig) (PreviewR
 		return PreviewResult{}, err
 	}
 	defer pa.Close()
+	if c.ID != "" {
+		if _, err := h.visibleConfig(h.scopeOf(ctx), c.ID); err != nil {
+			return PreviewResult{}, err
+		}
+	}
 	if err := pa.check(c); err != nil {
 		return PreviewResult{}, err
 	}
-	var entries []engine.PreviewEntry
-	var total int
-	// The walk itself runs as the caller, so subfolders they cannot read
-	// are skipped by the OS rather than listed with SYSTEM's rights.
-	err = pa.do(func() error {
-		var perr error
-		entries, total, perr = h.eng.Preview(c, 500)
-		return perr
-	})
+	// The walk runs as the caller, so subfolders they cannot read are
+	// skipped by the OS rather than listed with SYSTEM's rights.
+	var run func(func() error) error
+	if pa.tok != nil {
+		run = pa.do
+	}
+	entries, total, err := h.eng.Preview(c, 500, run)
 	if err != nil {
 		var ae *Error
 		if errors.As(err, &ae) {
@@ -803,7 +830,7 @@ func (h *Host) Snapshot(ctx context.Context) (engine.Snapshot, error) {
 	if err := h.live(); err != nil {
 		return engine.Snapshot{}, err
 	}
-	return h.eng.Snapshot(), nil
+	return h.filterSnapshot(h.scopeOf(ctx), h.eng.Snapshot()), nil
 }
 
 func (h *Host) SetPaused(ctx context.Context, paused bool) error {
@@ -827,7 +854,7 @@ func (h *Host) RetryFailed(ctx context.Context, id int64) (int64, error) {
 	if id < 0 {
 		return 0, invalidf("invalid item id")
 	}
-	return h.eng.RetryFailed(id)
+	return h.eng.RetryFailedIn(id, h.ownedIDs(h.scopeOf(ctx)))
 }
 
 func validQueueStatus(s string) bool {
@@ -845,7 +872,7 @@ func (h *Host) ListQueue(ctx context.Context, status string) ([]state.Item, erro
 	if !validQueueStatus(status) {
 		return nil, invalidf("unknown queue status")
 	}
-	return h.eng.Items(status, 500)
+	return h.eng.Items(status, h.ownedIDs(h.scopeOf(ctx)), 500)
 }
 
 func (h *Host) ListHistory(ctx context.Context, status string) ([]state.HistoryEntry, error) {
@@ -855,7 +882,7 @@ func (h *Host) ListHistory(ctx context.Context, status string) ([]state.HistoryE
 	if len(status) > 32 {
 		return nil, invalidf("unknown history status")
 	}
-	return h.eng.History(status, 500)
+	return h.eng.History(status, h.ownedIDs(h.scopeOf(ctx)), 500)
 }
 
 // --- automations ---
@@ -928,5 +955,5 @@ func (h *Host) Subscribe(ctx context.Context, kinds ...EventKind) (Subscription,
 	if err := h.live(); err != nil {
 		return nil, err
 	}
-	return h.bus.SubscribeContext(ctx, kinds...), nil
+	return h.scopedEvents(ctx, h.bus.SubscribeContext(ctx, kinds...)), nil
 }

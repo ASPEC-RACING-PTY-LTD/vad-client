@@ -63,6 +63,9 @@ type Notification struct {
 	Title   string `json:"title"`
 	Message string `json:"message"`
 	Level   string `json:"level"` // info, warning, error
+	// OwnerSID limits the notification to one user's pipe clients (an
+	// automation message about their folder); empty means everyone.
+	OwnerSID string `json:"owner_sid,omitempty"`
 }
 
 // LogEvent is one log record.

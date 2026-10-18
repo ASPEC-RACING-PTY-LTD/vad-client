@@ -58,6 +58,7 @@ type Engine struct {
 	log  *slog.Logger
 	xfer *transfer.Core
 	ctrl *Controller // == xfer.Controller()
+	id   identity    // owner tokens (identity.go)
 
 	mu           sync.Mutex
 	client       *client.Client
@@ -94,6 +95,9 @@ type Engine struct {
 	cancel   context.CancelFunc
 	wg       sync.WaitGroup
 	Notifier Notifier
+	// NotifyOwner, when set, replaces Notifier for automation messages and
+	// receives the configuration's OwnerSID so only that user sees them.
+	NotifyOwner func(ownerSID, title, message, level string)
 	// OnRevoked is called when the server reports the device was revoked.
 	OnRevoked func()
 }
@@ -178,6 +182,12 @@ func (e *Engine) Stop() {
 	case <-time.After(10 * time.Second):
 	}
 	e.st.ReleaseActive()
+	if e.EnforcesOwner() {
+		e.id.mu.Lock()
+		p := e.id.p
+		e.id.mu.Unlock()
+		e.SetTokens(p) // closes the cached owner tokens
+	}
 }
 
 // SetClient sets (or clears) the authenticated server client.
@@ -289,7 +299,9 @@ func (e *Engine) SaveConfig(c config.SyncConfig) (config.SyncConfig, error) {
 		return c, err
 	}
 	for _, other := range e.Configs() {
-		if other.ID != c.ID && strings.EqualFold(other.Name, c.Name) {
+		// Names are unique per owner (automations start tasks by name within
+		// one owner), so the check never reveals another user's folders.
+		if other.ID != c.ID && strings.EqualFold(other.Name, c.Name) && strings.EqualFold(other.OwnerSID, c.OwnerSID) {
 			return c, fmt.Errorf("another configuration is already called %q", c.Name)
 		}
 	}
@@ -376,8 +388,12 @@ func (e *Engine) Paused() bool {
 }
 
 // RetryFailed moves failed items back into the queue.
-func (e *Engine) RetryFailed(id int64) (int64, error) {
-	n, err := e.st.RetryFailed(id)
+func (e *Engine) RetryFailed(id int64) (int64, error) { return e.RetryFailedIn(id, nil) }
+
+// RetryFailedIn is RetryFailed limited to the configurations in only (nil
+// means all).
+func (e *Engine) RetryFailedIn(id int64, only []string) (int64, error) {
+	n, err := e.st.RetryFailedIn(id, only)
 	e.kick()
 	return n, err
 }
@@ -386,6 +402,7 @@ func (e *Engine) RetryFailed(id int64) (int64, error) {
 
 type ActiveView struct {
 	ID       int64   `json:"id"`
+	ConfigID string  `json:"config_id"`
 	Config   string  `json:"config"`
 	Path     string  `json:"path"`
 	Remote   string  `json:"remote"`
@@ -438,7 +455,7 @@ func (e *Engine) Snapshot() Snapshot {
 		if c := e.configs[a.item.ConfigID]; c != nil {
 			cfg = c.Name
 		}
-		s.Active = append(s.Active, ActiveView{ID: a.item.ID, Config: cfg, Path: a.item.RelPath, Remote: a.item.RemotePath(), Size: a.size, Sent: a.sent.Load(), Speed: sp, Phase: ph, Started: a.started.UnixMilli(), Attempts: a.item.Attempts})
+		s.Active = append(s.Active, ActiveView{ID: a.item.ID, ConfigID: a.item.ConfigID, Config: cfg, Path: a.item.RelPath, Remote: a.item.RemotePath(), Size: a.size, Sent: a.sent.Load(), Speed: sp, Phase: ph, Started: a.started.UnixMilli(), Attempts: a.item.Attempts})
 	}
 	sort.Slice(s.Active, func(i, j int) bool { return s.Active[i].Started < s.Active[j].Started })
 	if s.Active == nil {
@@ -457,14 +474,16 @@ func (e *Engine) setStatus(status, msg string) {
 	e.mu.Unlock()
 }
 
-// Items returns queue items for the UI.
-func (e *Engine) Items(status string, limit int) ([]state.Item, error) {
-	return e.st.Items(status, limit)
+// Items returns queue items for the UI, limited to the configurations in
+// only (nil means all).
+func (e *Engine) Items(status string, only []string, limit int) ([]state.Item, error) {
+	return e.st.ItemsIn(status, only, limit)
 }
 
-// History returns finished transfers.
-func (e *Engine) History(status string, limit int) ([]state.HistoryEntry, error) {
-	return e.st.History(status, limit)
+// History returns finished transfers, limited to the configurations in only
+// (nil means all).
+func (e *Engine) History(status string, only []string, limit int) ([]state.HistoryEntry, error) {
+	return e.st.HistoryIn(status, only, limit)
 }
 
 var errRevoked = errors.New("device revoked")

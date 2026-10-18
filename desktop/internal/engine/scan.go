@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -65,7 +66,19 @@ func (e *Engine) Scan(cfgID string, manual bool) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	seen := map[string]bool{}
+	// The walk runs as the configuration's owner and only collects; issues,
+	// logging and queueing happen afterwards with the agent's identity.
+	var w walkResult
+	if err := e.asOwner(cfg, func() error { w = e.collect(cfg, flt, index); return nil }); err != nil {
+		e.setLastErr(cfgID, ownerMessage(err))
+		e.log.Warn("scan: owner identity unavailable", "config", cfg.Name, "err", err)
+		return 0, err
+	}
+	if w.rootErr != nil {
+		root := cfg.LocalPath
+		e.setLastErr(cfgID, "The folder "+root+" is not available (was it moved, renamed, is the drive disconnected, or can its owner no longer open it?)")
+		return 0, fmt.Errorf("folder %s is not available", root)
+	}
 	queued := 0
 	// skipped records an unreadable, locked or inaccessible entry once per
 	// path per scan as a visible issue (B12); the scan carries on.
@@ -85,6 +98,65 @@ func (e *Engine) Scan(cfgID string, manual bool) (int, error) {
 		e.log.Warn("scan: skipped entry", "config", cfg.Name, "path", rel, "class", class, "err", err)
 		e.recordIssue(issueSourceScan, cfgID, rel, class, err.Error())
 	}
+	for _, sk := range w.skips {
+		skipped(sk.rel, sk.err)
+	}
+	for _, h := range w.hits {
+		if h.probe != nil {
+			skipped(h.rel, h.probe)
+			if classifyIssue(h.probe) != issueLocked {
+				continue // cannot be read at all; a locked file is still queued and deferred by the transfer
+			}
+		}
+		prev, known := index[h.rel]
+		ev := "file.created"
+		if known && prev.Status != "deleted" {
+			ev = "file.modified"
+		}
+		if e.consider(cfg, flt, h.rel, h.abs, h.fi, ev, manual, "", 0) {
+			queued++
+		}
+	}
+	e.setLastErr(cfgID, "")
+	// Files that disappeared: record as deleted locally (server copies stay).
+	for _, rel := range w.gone {
+		e.fileDeleted(cfg, rel)
+	}
+	if w.walkErr != nil && e.ctx != nil && e.ctx.Err() == nil {
+		e.log.Warn("scan incomplete", "config", cfg.Name, "err", w.walkErr)
+	}
+	e.log.Info("scan finished", "config", cfg.Name, "queued", queued, "files_seen", len(w.seen))
+	return queued, w.walkErr
+}
+
+// scanHit is a new or changed file found by collect.
+type scanHit struct {
+	rel, abs string
+	fi       os.FileInfo
+	probe    error // probeRead result
+}
+
+type scanSkip struct {
+	rel string
+	err error
+}
+
+// walkResult is what collect gathered.
+type walkResult struct {
+	hits    []scanHit
+	skips   []scanSkip
+	seen    map[string]bool
+	gone    []string // indexed files that no longer exist
+	rootErr error    // the folder itself is unavailable
+	walkErr error
+}
+
+// collect walks cfg and compares it with index. It runs impersonating the
+// owner, so it only touches the file system: no logging, no state.db, no
+// goroutines.
+func (e *Engine) collect(cfg *config.SyncConfig, flt *filter.Filter, index map[string]state.FileEntry) walkResult {
+	w := walkResult{seen: map[string]bool{}}
+	skip := func(rel string, err error) { w.skips = append(w.skips, scanSkip{rel, err}) }
 	visit := func(abs string, fi os.FileInfo) {
 		rel := relPath(cfg, abs)
 		if rel == "" {
@@ -93,27 +165,14 @@ func (e *Engine) Scan(cfgID string, manual bool) (int, error) {
 		if ok, _ := flt.Match(rel, fi.Size(), fi.ModTime(), isHidden(fi)); !ok {
 			return
 		}
-		seen[rel] = true
+		w.seen[rel] = true
 		prev, known := index[rel]
 		if known && prev.Size == fi.Size() && prev.MTime == fi.ModTime().UnixNano() && prev.Status != "deleted" && prev.Status != "failed" {
 			return
 		}
-		if err := probeRead(abs); err != nil {
-			skipped(rel, err)
-			if classifyIssue(err) != issueLocked {
-				return // cannot be read at all; a locked file is still queued and deferred by the transfer
-			}
-		}
-		ev := "file.created"
-		if known && prev.Status != "deleted" {
-			ev = "file.modified"
-		}
-		if e.consider(cfg, flt, rel, abs, fi, ev, manual, "", 0) {
-			queued++
-		}
+		w.hits = append(w.hits, scanHit{rel: rel, abs: abs, fi: fi, probe: probeRead(abs)})
 	}
 
-	var walkErr error
 	switch cfg.Kind {
 	case "files":
 		for _, p := range cfg.Files {
@@ -123,7 +182,7 @@ func (e *Engine) Scan(cfgID string, manual bool) (int, error) {
 				if rel == "" {
 					rel = toSlash(p)
 				}
-				skipped(rel, err)
+				skip(rel, err)
 				continue
 			}
 			if fi.IsDir() {
@@ -134,15 +193,18 @@ func (e *Engine) Scan(cfgID string, manual bool) (int, error) {
 	default:
 		root := cfg.LocalPath
 		if st, err := os.Stat(root); err != nil || !st.IsDir() {
-			e.setLastErr(cfgID, "The folder "+root+" is not available (was it moved, renamed or is the drive disconnected?)")
-			return 0, fmt.Errorf("folder %s is not available", root)
+			if err == nil {
+				err = fmt.Errorf("%s is not a folder", root)
+			}
+			w.rootErr = err
+			return w
 		}
-		walkErr = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		w.walkErr = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 			if e.ctx != nil && e.ctx.Err() != nil {
 				return e.ctx.Err()
 			}
 			if err != nil {
-				skipped(relPath(cfg, p), err)
+				skip(relPath(cfg, p), err)
 				if d != nil && d.IsDir() && p != root {
 					return fs.SkipDir // unreadable folder: skip, keep scanning
 				}
@@ -154,7 +216,7 @@ func (e *Engine) Scan(cfgID string, manual bool) (int, error) {
 				}
 				info, err := d.Info()
 				if err != nil {
-					skipped(relPath(cfg, p), err)
+					skip(relPath(cfg, p), err)
 					return fs.SkipDir
 				}
 				if !flt.WalkDir(relPath(cfg, p), isHidden(info)) {
@@ -167,28 +229,30 @@ func (e *Engine) Scan(cfgID string, manual bool) (int, error) {
 			}
 			info, err := d.Info()
 			if err != nil {
-				skipped(relPath(cfg, p), err)
+				skip(relPath(cfg, p), err)
 				return nil
 			}
 			visit(p, info)
 			return nil
 		})
 	}
-	e.setLastErr(cfgID, "")
-	// Files that disappeared: record as deleted locally (server copies stay).
 	for rel, entry := range index {
-		if seen[rel] || entry.Status == "deleted" {
+		if w.seen[rel] || entry.Status == "deleted" {
 			continue
 		}
 		if _, err := os.Stat(absPath(cfg, rel)); os.IsNotExist(err) {
-			e.fileDeleted(cfg, rel)
+			w.gone = append(w.gone, rel)
 		}
 	}
-	if walkErr != nil && e.ctx != nil && e.ctx.Err() == nil {
-		e.log.Warn("scan incomplete", "config", cfg.Name, "err", walkErr)
+	return w
+}
+
+// ownerMessage is the configuration status text for an owner error.
+func ownerMessage(err error) string {
+	if errors.Is(err, ErrNoOwner) {
+		return "This folder has no owner, so the VaultDock service does not synchronise it. Open VaultDock as the user who owns the folder and save it again."
 	}
-	e.log.Info("scan finished", "config", cfg.Name, "queued", queued, "files_seen", len(seen))
-	return queued, walkErr
+	return "VaultDock cannot act as this folder's owner right now (" + err.Error() + "); it will try again."
 }
 
 func (e *Engine) setLastErr(cfgID, msg string) {
@@ -294,8 +358,10 @@ type PreviewEntry struct {
 }
 
 // Preview evaluates a configuration (saved or draft) against the files on
-// disk without queuing anything: a dry run of filters and automations.
-func (e *Engine) Preview(c config.SyncConfig, limit int) ([]PreviewEntry, int, error) {
+// disk without queuing anything: a dry run of filters and automations. run
+// performs the file-system walk (the agent passes one that impersonates the
+// caller); nil runs it directly. Only the walk runs inside run.
+func (e *Engine) Preview(c config.SyncConfig, limit int, run func(func() error) error) ([]PreviewEntry, int, error) {
 	if c.Kind == "files" && len(c.Files) > 0 {
 		c.LocalPath = commonDir(c.Files)
 	}
@@ -303,81 +369,93 @@ func (e *Engine) Preview(c config.SyncConfig, limit int) ([]PreviewEntry, int, e
 	if err := c.Validate(); err != nil {
 		return nil, 0, err
 	}
+	if run == nil {
+		run = func(fn func() error) error { return fn() }
+	}
 	flt := filter.New(&c)
+	var found []scanHit
+	total := 0
+	add := func(abs string, fi os.FileInfo) {
+		if relPath(&c, abs) == "" {
+			return
+		}
+		total++
+		if len(found) < limit {
+			found = append(found, scanHit{rel: relPath(&c, abs), abs: abs, fi: fi})
+		}
+	}
+	err := run(func() error {
+		if c.Kind == "files" {
+			for _, p := range c.Files {
+				if fi, err := os.Stat(p); err == nil && !fi.IsDir() {
+					add(p, fi)
+				}
+			}
+			return nil
+		}
+		if st, err := os.Stat(c.LocalPath); err != nil || !st.IsDir() {
+			return fmt.Errorf("folder %s is not available", c.LocalPath)
+		}
+		deadline := time.Now().Add(20 * time.Second)
+		return filepath.WalkDir(c.LocalPath, func(p string, d fs.DirEntry, err error) error {
+			if time.Now().After(deadline) || total > 200000 {
+				return fs.SkipAll
+			}
+			if err != nil {
+				if d != nil && d.IsDir() && p != c.LocalPath {
+					return fs.SkipDir
+				}
+				return nil
+			}
+			if d.IsDir() {
+				if p == c.LocalPath {
+					return nil
+				}
+				info, err := d.Info()
+				if err != nil || !flt.WalkDir(relPath(&c, p), isHidden(info)) {
+					return fs.SkipDir
+				}
+				return nil
+			}
+			if !d.Type().IsRegular() {
+				return nil
+			}
+			if info, err := d.Info(); err == nil {
+				add(p, info)
+			}
+			return nil
+		})
+	})
+	if err != nil && len(found) == 0 && total == 0 {
+		return nil, 0, err
+	}
+
 	autos := e.autosFor(&c)
 	var index map[string]state.FileEntry
 	if c.ID != "" {
 		index, _ = e.st.Index(c.ID)
 	}
-	var out []PreviewEntry
-	total := 0
-	add := func(abs string, fi os.FileInfo) {
-		rel := relPath(&c, abs)
-		if rel == "" {
-			return
-		}
-		total++
-		if len(out) >= limit {
-			return
-		}
-		pe := PreviewEntry{RelPath: rel, Size: fi.Size(), Modified: fi.ModTime().UnixMilli()}
-		if ok, why := flt.Match(rel, fi.Size(), fi.ModTime(), isHidden(fi)); !ok {
+	out := make([]PreviewEntry, 0, len(found))
+	for _, h := range found {
+		fi := h.fi
+		pe := PreviewEntry{RelPath: h.rel, Size: fi.Size(), Modified: fi.ModTime().UnixMilli()}
+		if ok, why := flt.Match(h.rel, fi.Size(), fi.ModTime(), isHidden(fi)); !ok {
 			pe.Decision, pe.Reason = "filtered", why
 			out = append(out, pe)
-			return
+			continue
 		}
-		plan := automation.EvaluateAll(autos, e.fileEvent(&c, rel, abs, fi, automation.EventFileCreated, ""))
+		plan := automation.EvaluateAll(autos, e.fileEvent(&c, h.rel, h.abs, fi, automation.EventFileCreated, ""))
 		if plan.Decision == "skip" {
 			pe.Decision, pe.Reason = "skip", plan.SkipReason
 		} else {
 			pe.Decision = "upload"
 			pe.Remote = strings.TrimRight(plan.RemoteDir, "/") + "/" + plan.RemoteName
 			pe.Tags = plan.Tags
-			if prev, ok := index[rel]; ok && prev.Status == "synced" && prev.Size == fi.Size() && prev.MTime == fi.ModTime().UnixNano() {
+			if prev, ok := index[h.rel]; ok && prev.Status == "synced" && prev.Size == fi.Size() && prev.MTime == fi.ModTime().UnixNano() {
 				pe.Decision = "synced"
 			}
 		}
 		out = append(out, pe)
 	}
-	if c.Kind == "files" {
-		for _, p := range c.Files {
-			if fi, err := os.Stat(p); err == nil && !fi.IsDir() {
-				add(p, fi)
-			}
-		}
-		return out, total, nil
-	}
-	if st, err := os.Stat(c.LocalPath); err != nil || !st.IsDir() {
-		return nil, 0, fmt.Errorf("folder %s is not available", c.LocalPath)
-	}
-	deadline := time.Now().Add(20 * time.Second)
-	err := filepath.WalkDir(c.LocalPath, func(p string, d fs.DirEntry, err error) error {
-		if time.Now().After(deadline) || total > 200000 {
-			return fs.SkipAll
-		}
-		if err != nil {
-			if d != nil && d.IsDir() && p != c.LocalPath {
-				return fs.SkipDir
-			}
-			return nil
-		}
-		if d.IsDir() {
-			if p == c.LocalPath {
-				return nil
-			}
-			info, err := d.Info()
-			if err != nil || !flt.WalkDir(relPath(&c, p), isHidden(info)) {
-				return fs.SkipDir
-			}
-			return nil
-		}
-		if !d.Type().IsRegular() {
-			return nil
-		}
-		if info, err := d.Info(); err == nil {
-			add(p, info)
-		}
-		return nil
-	})
 	return out, total, err
 }

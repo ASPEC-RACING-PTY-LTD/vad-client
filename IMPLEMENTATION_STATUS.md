@@ -38,6 +38,7 @@ INT fixes:
 - **INT-FIX-C:** docs and mode texts.
 - **INT-FIX-D:** host wiring.
 - **INT-FIX-E:** the server rejects key files of another repository; the keystore requires a repo id; `testkit.Password`.
+- **INT-SEC (after Phase 1):** sync folders are read as their owner, and configurations are scoped per user.
 - **Done directly by INT:**
   - `go mod tidy` and `gofmt` in all modules;
   - `web/dist/.keep`, `.gitattributes` (`deploy/**`), and `test-results` ignored;
@@ -87,9 +88,14 @@ All of these pass:
 
 ## Open follow-ups (from the reports)
 
-**Security:**
-- The sync engine's background scans and uploads still run as SYSTEM, so subfolders with tighter ACLs under a readable root are read with SYSTEM's rights. The fix needs per-config owners (§7.8): scan under `tokens.ForProfile(owner)`.
-- Configs are still machine-global: any pipe user can edit them.
+**Security:** both Phase 1 items are fixed by INT-SEC (see `SUBAGENT-INT-SEC-owner-identity.md`):
+- sync configurations have an owner;
+- in the service every scan, stat and open runs with the owner's token;
+- pipe clients only see and act on their own folders, queue, history and events.
+
+What remains:
+- Validate with real session and S4U tokens on an elevated VM.
+- The C5 marker import should set `OwnerSID`.
 
 **Backup engine:**
 - Per-file memory for the whole tree.
