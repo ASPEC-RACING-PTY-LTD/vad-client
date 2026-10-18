@@ -155,22 +155,16 @@ func RequireSystemServer(conn net.Conn) error {
 	}
 	p, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
 	if err != nil {
-		return fmt.Errorf("open server process: %w", err)
+		// A standard user may be denied even limited access to the service
+		// process. The service manager still tells any user which process
+		// runs the agent service, so trust the pipe only if it is that one.
+		return requireServicePID(pid, err)
 	}
 	defer windows.CloseHandle(p)
 	var tok windows.Token
 	if err := windows.OpenProcessToken(p, windows.TOKEN_QUERY, &tok); err != nil {
-		// A non-admin cannot open a SYSTEM process token; reaching a
-		// LocalSystem server's token is not possible for a user either, so
-		// fall back to the session: services run in session 0.
-		var sess uint32
-		if serr := windows.ProcessIdToSessionId(pid, &sess); serr != nil {
-			return fmt.Errorf("server session: %w", serr)
-		}
-		if sess != 0 {
-			return errors.New("pipe server is not a service (session " + fmt.Sprint(sess) + ")")
-		}
-		return nil
+		// A non-admin cannot open a SYSTEM process token either.
+		return requireServicePID(pid, err)
 	}
 	defer tok.Close()
 	user, err := tok.GetTokenUser()
@@ -179,6 +173,36 @@ func RequireSystemServer(conn net.Conn) error {
 	}
 	if !user.User.Sid.IsWellKnown(windows.WinLocalSystemSid) {
 		return errors.New("pipe server is not LocalSystem")
+	}
+	return nil
+}
+
+// AgentServiceName is the Windows service whose process may serve the pipe
+// (service.DefaultName; not imported to keep ipc free of service deps).
+const AgentServiceName = "VaultDockAgent"
+
+// requireServicePID accepts pid only when the service control manager says
+// it is the running process of AgentServiceName (SERVICE_QUERY_STATUS, which
+// every user has). cause is why the process could not be inspected directly.
+func requireServicePID(pid uint32, cause error) error {
+	m, err := windows.OpenSCManager(nil, nil, windows.SC_MANAGER_CONNECT)
+	if err != nil {
+		return fmt.Errorf("open server process: %w (service manager: %v)", cause, err)
+	}
+	defer windows.CloseServiceHandle(m)
+	name, _ := windows.UTF16PtrFromString(AgentServiceName)
+	svc, err := windows.OpenService(m, name, windows.SERVICE_QUERY_STATUS)
+	if err != nil {
+		return fmt.Errorf("open server process: %w (agent service: %v)", cause, err)
+	}
+	defer windows.CloseServiceHandle(svc)
+	var st windows.SERVICE_STATUS_PROCESS
+	var n uint32
+	if err := windows.QueryServiceStatusEx(svc, windows.SC_STATUS_PROCESS_INFO, (*byte)(unsafe.Pointer(&st)), uint32(unsafe.Sizeof(st)), &n); err != nil {
+		return fmt.Errorf("open server process: %w (service status: %v)", cause, err)
+	}
+	if st.CurrentState != windows.SERVICE_RUNNING || st.ProcessId != pid {
+		return errors.New("pipe server (pid " + fmt.Sprint(pid) + ") is not the " + AgentServiceName + " service")
 	}
 	return nil
 }
