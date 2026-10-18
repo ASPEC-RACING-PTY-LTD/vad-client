@@ -45,8 +45,14 @@ Function VD_StopForUpgrade
         nsExec::ExecToLog '"$INSTDIR\${VD_AGENT_EXE}" stop -timeout 60s'
         Pop $0
     ${Else}
-        nsExec::ExecToLog '"$SYSDIR\net.exe" stop ${VD_SERVICE_NAME}'
+        # First install: no service yet, so skip net stop ("The service name
+        # is invalid" would only confuse).
+        nsExec::Exec '"$SYSDIR\sc.exe" query ${VD_SERVICE_NAME}'
         Pop $0
+        ${If} $0 == 0
+            nsExec::ExecToLog '"$SYSDIR\net.exe" stop ${VD_SERVICE_NAME}'
+            Pop $0
+        ${EndIf}
     ${EndIf}
     DetailPrint "Stop ${VD_SERVICE_NAME}: exit $0"
     nsExec::Exec '"$SYSDIR\taskkill.exe" /IM "${VD_AGENT_EXE}" /F'
