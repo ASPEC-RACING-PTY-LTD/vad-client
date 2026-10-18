@@ -13,6 +13,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"io"
+	"log/slog"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -59,8 +60,17 @@ type Core struct {
 	ctrl    *Controller
 	limiter Limiter
 	hashSem chan struct{}
-	noZstd  atomic.Bool // the server refused a compressed chunk (no upload.zstd)
+	// noZstdUntil (unix ms): the server refused a compressed chunk (no
+	// upload.zstd), so chunks go raw until then. It expires so a server that
+	// is upgraded later is used compressed without restarting the agent.
+	noZstdUntil atomic.Int64
+	zstdLogged  atomic.Bool
 }
+
+// zstdRetry is how long chunks go raw after a server refused compression.
+const zstdRetry = 10 * time.Minute
+
+func (c *Core) zstdOff() bool { return time.Now().UnixMilli() < c.noZstdUntil.Load() }
 
 // New returns a core with an automatic maximum of maxParallel parallel
 // requests and at most hashParallel concurrent whole-file hashes (bounded to
@@ -232,14 +242,19 @@ func (c *Core) sendChunk(ctx context.Context, cl *client.Client, up *client.Uplo
 		start := time.Now()
 		var err error
 		zipped := false
-		if compress && !c.noZstd.Load() {
+		if compress && !c.zstdOff() {
 			zipped, err = cl.PutChunkCompressed(ctx, up.ID, idx, r, off, n, sum)
 			if zipped && err != nil && unsupportedEncoding(err) {
 				// A server without upload.zstd: send this and later chunks raw.
-				c.noZstd.Store(true)
+				if c.noZstdUntil.Swap(time.Now().Add(zstdRetry).UnixMilli()) == 0 {
+					slog.Warn("server does not accept compressed uploads (upload.zstd); sending uncompressed", "err", err)
+				}
 				zipped, err = false, nil
 			}
 			if zipped && err == nil {
+				if !c.zstdLogged.Swap(true) {
+					slog.Info("sending compressed upload chunks", "upload", up.ID)
+				}
 				local.Store(n) // progress counts raw bytes
 				sent.Add(n)
 			}
