@@ -17,5 +17,8 @@
     "copyright": "VaultDock contributors",
     "comments": "Self-hosted file storage and intelligent synchronisation"
   },
-  "nsisType": "single"
+  "nsisType": "single",
+  "preBuildHooks": {
+    "windows/*": "go run ../windows/installer/build-agent.go ${platform}"
+  }
 }

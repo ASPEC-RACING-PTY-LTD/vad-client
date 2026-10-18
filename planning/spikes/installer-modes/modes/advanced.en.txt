@@ -1,0 +1,45 @@
+FULL ACCESS TO ALL TOOLS (ADVANCED)
+
+What it does
+- Everything in Simple Folder Backups, plus:
+- One-way and two-way sync of folders with your VaultDock server.
+- Automations (rules that run backups, syncs or clean-ups for you).
+- Discovery of installed apps, games and developer projects.
+- Reinstalling apps on a new or repaired PC (with your confirmation each time).
+- Backup of app settings and selected registry keys.
+- Snapshots (Windows shadow copies) so files that are open and locked can
+  still be backed up consistently.
+- Protecting other Windows profiles on this PC, only when those users agree.
+- Extra management screens.
+
+Scope (what it touches)
+- The folders, apps and settings you select.
+- Other Windows profiles only after that user signs in, opens VaultDock and
+  gives consent. VaultDock never stores Windows passwords.
+- Windows system folders and system registry areas are always off limits,
+  in both modes.
+
+Permissions
+- Installing needs administrator rights, as in Simple mode.
+- The background service additionally gets the Windows backup and restore
+  privileges, which are needed to create shadow copies of locked files.
+- Installing apps uses winget, Chocolatey or Scoop and always asks you first.
+- Two-way sync can change and delete files in the synced folders on this PC
+  (deleted files go to the Recycle Bin).
+
+Resources
+- Download: after installation, VaultDock downloads extra components
+  (snapshots, discovery and reinstall) from the official VaultDock releases
+  on GitHub and checks each one before use. This adds roughly tens of MB.
+- More CPU and disk activity during discovery scans and snapshots.
+- Shadow copies use some temporary space on the drive being backed up.
+
+Compared with Simple Folder Backups
+- Simple only backs up and restores folders in your own profile.
+- Advanced adds sync, automations, app and settings tools, snapshots and
+  multi-profile protection, and needs more permissions and resources.
+
+Changing your mind
+- You can switch back to Simple later in Settings > Mode. Nothing is deleted:
+  sync and app jobs are paused, and all backups stay browsable and
+  restorable.

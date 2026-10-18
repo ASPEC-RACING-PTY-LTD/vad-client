@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ArrowUpCircle, FileText, LogOut, RefreshCw } from 'lucide-react'
 import { CheckForUpdates, Disconnect, GetSettings, GetUpdateStatus, InstallUpdate, OpenLogsFolder, OpenURL, SaveSettings } from '../../wailsjs/go/main/App'
-import type { config, main, updater } from '../../wailsjs/go/models'
+import type { agent, config, updater } from '../../wailsjs/go/models'
 import { EventsOn } from '../../wailsjs/runtime/runtime'
 import { Button, Field, PageLoader, Toggle, useUI } from '../ui'
 import { errMsg, timeAgo } from '../lib'
@@ -30,7 +30,7 @@ function UpdateLine({ u }: { u: updater.Status }) {
   }
 }
 
-export function SettingsScreen({ boot, onChanged }: { boot: main.Bootstrap; onChanged: () => void }) {
+export function SettingsScreen({ boot, onChanged }: { boot: agent.Bootstrap; onChanged: () => void }) {
   const [s, setS] = useState<config.Settings | null>(null)
   const [update, setUpdate] = useState<updater.Status | null>(null)
   const [checking, setChecking] = useState(false)

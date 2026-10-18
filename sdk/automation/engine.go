@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/mimetypes"
@@ -166,8 +167,11 @@ type Outcome struct {
 	Tags           []string       `json:"tags,omitempty"`
 	StartTasks     []string       `json:"start_tasks,omitempty"`
 	Notifications  []Notification `json:"notifications,omitempty"`
-	Trace          []TraceStep    `json:"trace"`
-	Warnings       []string       `json:"warnings,omitempty"`
+	// Ops are generic operations emitted by kinds without a dedicated
+	// field above.
+	Ops      []Op        `json:"ops,omitempty"`
+	Trace    []TraceStep `json:"trace"`
+	Warnings []string    `json:"warnings,omitempty"`
 }
 
 // Evaluate runs one automation against an event. Evaluation is pure: it
@@ -271,6 +275,109 @@ func isFileEvent(t string) bool {
 	return t == EventFileCreated || t == EventFileModified || t == EventFileRenamed || t == EventFileDeleted
 }
 
+// TriggerFunc reports whether a trigger node matches an event, with an
+// optional reason when it does not.
+type TriggerFunc func(n *Node, ev *Event, vars Vars) (bool, string)
+
+// ConditionFunc evaluates a condition (or a nested group rule) and returns
+// the result with a human-readable detail. depth is the group nesting level.
+type ConditionFunc func(p map[string]any, vars Vars, depth int) (bool, string)
+
+// ActionFunc records an action's effect on the outcome and returns a detail
+// for the trace. New kinds should emit generic ops (Outcome.EmitOp) rather
+// than adding Outcome fields.
+type ActionFunc func(o *Outcome, n *Node, vars Vars, ev *Event) string
+
+// Handlers are the runtime functions for one kind; only the one matching the
+// kind's node type is used.
+type Handlers struct {
+	Match TriggerFunc
+	Eval  ConditionFunc
+	Apply ActionFunc
+}
+
+var (
+	handlersMu sync.RWMutex
+	handlers   = map[string]Handlers{}
+)
+
+// RegisterHandlers attaches runtime handlers to a kind of DefaultRegistry.
+// The kind must already be registered and the handler for its node type must
+// be set. Registration normally happens in init.
+func RegisterHandlers(nodeType, kind string, h Handlers) error {
+	if DefaultRegistry.Lookup(nodeType, kind) == nil {
+		return fmt.Errorf("automation: handlers for unknown %s %q", nodeType, kind)
+	}
+	if (nodeType == TypeTrigger && h.Match == nil) || (nodeType == TypeCondition && h.Eval == nil) || (nodeType == TypeAction && h.Apply == nil) {
+		return fmt.Errorf("automation: handlers for %s %q: missing %s handler", nodeType, kind, nodeType)
+	}
+	handlersMu.Lock()
+	defer handlersMu.Unlock()
+	key := nodeType + "/" + kind
+	if _, dup := handlers[key]; dup {
+		return fmt.Errorf("automation: handlers for %s %q: already registered", nodeType, kind)
+	}
+	handlers[key] = h
+	return nil
+}
+
+// MustRegisterHandlers is RegisterHandlers that panics on error.
+func MustRegisterHandlers(nodeType, kind string, h Handlers) {
+	if err := RegisterHandlers(nodeType, kind, h); err != nil {
+		panic(err)
+	}
+}
+
+func lookupHandlers(nodeType, kind string) Handlers {
+	handlersMu.RLock()
+	defer handlersMu.RUnlock()
+	return handlers[nodeType+"/"+kind]
+}
+
+func init() {
+	for _, k := range []string{"file.created", "file.modified", "file.renamed", "file.deleted"} {
+		MustRegisterHandlers(TypeTrigger, k, Handlers{Match: matchFileEvent})
+	}
+	MustRegisterHandlers(TypeTrigger, "folder.changed", Handlers{Match: matchFolderChanged})
+	MustRegisterHandlers(TypeTrigger, "schedule.interval", Handlers{Match: func(n *Node, ev *Event, _ Vars) (bool, string) {
+		return ev.Type == EventScheduleTick && ev.TriggerNodeID == n.ID, ""
+	}})
+	for _, k := range []string{"sync.completed", "sync.failed"} {
+		MustRegisterHandlers(TypeTrigger, k, Handlers{Match: func(n *Node, ev *Event, _ Vars) (bool, string) {
+			return ev.Type == n.Kind, ""
+		}})
+	}
+	MustRegisterHandlers(TypeTrigger, "file.size_threshold", Handlers{Match: matchSizeThreshold})
+	MustRegisterHandlers(TypeTrigger, "file.extension_matched", Handlers{Match: matchExtension})
+
+	for k, fn := range map[string]ConditionFunc{
+		"name.contains":    condNameContains,
+		"name.matches":     condNameMatches,
+		"extension.in":     condExtensionIn,
+		"size.compare":     condSizeCompare,
+		"path.matches":     condPathMatches,
+		"file.age":         condFileAge,
+		"date.compare":     condDateCompare,
+		"variable.compare": func(p map[string]any, vars Vars, _ int) (bool, string) { return compareVariable(p, vars) },
+		"group":            condGroup,
+	} {
+		MustRegisterHandlers(TypeCondition, k, Handlers{Eval: fn})
+	}
+
+	for k, fn := range map[string]ActionFunc{
+		"sync.file":          actSyncFile,
+		"sync.skip":          actSyncSkip,
+		"dest.set_folder":    actSetFolder,
+		"dest.rename":        actRename,
+		"dest.create_folder": actCreateFolder,
+		"tag.apply":          actTagApply,
+		"sync.start_task":    actStartTask,
+		"notify.send":        actNotify,
+	} {
+		MustRegisterHandlers(TypeAction, k, Handlers{Apply: fn})
+	}
+}
+
 func matchTrigger(n *Node, ev *Event, vars Vars) (bool, string) {
 	if cfgs := toStrings(n.Params["configs"]); len(cfgs) > 0 {
 		found := false
@@ -283,51 +390,60 @@ func matchTrigger(n *Node, ev *Event, vars Vars) (bool, string) {
 			return false, fmt.Sprintf("sync configuration %q is not in the trigger's list", ev.Config)
 		}
 	}
-	isDir := ev.File != nil && ev.File.IsDir
-	switch n.Kind {
-	case "file.created", "file.modified", "file.renamed", "file.deleted":
-		return ev.Type == n.Kind && ev.File != nil && !isDir, ""
-	case "folder.changed":
-		if !isFileEvent(ev.Type) || ev.File == nil {
-			return false, ""
-		}
-		dir, _ := vars["file.rel_dir"].(string)
-		if isDir {
-			dir, _ = vars["file.rel_path"].(string)
-		}
-		pat := strParam(n.Params, "folder")
-		if pat == "" {
-			pat = "**"
-		}
-		if pat == "**" || MatchGlob(pat, dir, false) {
-			return true, ""
-		}
-		return false, fmt.Sprintf("folder %q does not match %q", dir, pat)
-	case "schedule.interval":
-		return ev.Type == EventScheduleTick && ev.TriggerNodeID == n.ID, ""
-	case "sync.completed", "sync.failed":
-		return ev.Type == n.Kind, ""
-	case "file.size_threshold":
-		if (ev.Type != EventFileCreated && ev.Type != EventFileModified) || ev.File == nil || isDir {
-			return false, ""
-		}
-		if float64(ev.File.Size) >= numParam(n.Params, "bytes") {
-			return true, ""
-		}
-		return false, fmt.Sprintf("size %d is below the threshold", ev.File.Size)
-	case "file.extension_matched":
-		if (ev.Type != EventFileCreated && ev.Type != EventFileModified) || ev.File == nil || isDir {
-			return false, ""
-		}
-		ext, _ := vars["file.ext"].(string)
-		for _, e := range toStrings(n.Params["extensions"]) {
-			if strings.EqualFold(e, ext) {
-				return true, ""
-			}
-		}
-		return false, fmt.Sprintf("extension %q is not listed", ext)
+	h := lookupHandlers(TypeTrigger, n.Kind)
+	if h.Match == nil {
+		return false, ""
 	}
-	return false, ""
+	return h.Match(n, ev, vars)
+}
+
+func matchFileEvent(n *Node, ev *Event, _ Vars) (bool, string) {
+	return ev.Type == n.Kind && ev.File != nil && !ev.File.IsDir, ""
+}
+
+func matchFolderChanged(n *Node, ev *Event, vars Vars) (bool, string) {
+	if !isFileEvent(ev.Type) || ev.File == nil {
+		return false, ""
+	}
+	dir, _ := vars["file.rel_dir"].(string)
+	if ev.File.IsDir {
+		dir, _ = vars["file.rel_path"].(string)
+	}
+	pat := strParam(n.Params, "folder")
+	if pat == "" {
+		pat = "**"
+	}
+	if pat == "**" || MatchGlob(pat, dir, false) {
+		return true, ""
+	}
+	return false, fmt.Sprintf("folder %q does not match %q", dir, pat)
+}
+
+func isFileWrite(ev *Event) bool {
+	return (ev.Type == EventFileCreated || ev.Type == EventFileModified) && ev.File != nil && !ev.File.IsDir
+}
+
+func matchSizeThreshold(n *Node, ev *Event, _ Vars) (bool, string) {
+	if !isFileWrite(ev) {
+		return false, ""
+	}
+	if float64(ev.File.Size) >= numParam(n.Params, "bytes") {
+		return true, ""
+	}
+	return false, fmt.Sprintf("size %d is below the threshold", ev.File.Size)
+}
+
+func matchExtension(n *Node, ev *Event, vars Vars) (bool, string) {
+	if !isFileWrite(ev) {
+		return false, ""
+	}
+	ext, _ := vars["file.ext"].(string)
+	for _, e := range toStrings(n.Params["extensions"]) {
+		if strings.EqualFold(e, ext) {
+			return true, ""
+		}
+	}
+	return false, fmt.Sprintf("extension %q is not listed", ext)
 }
 
 func compareNum(op string, a, b float64) bool {
@@ -355,81 +471,97 @@ func evalCondition(kind string, p map[string]any, vars Vars, depth int) (bool, s
 }
 
 func evalConditionRaw(kind string, p map[string]any, vars Vars, depth int) (bool, string) {
-	name, _ := vars["file.name"].(string)
-	cs := boolParam(p, "case_sensitive")
-	switch kind {
-	case "name.contains":
-		text := strParam(p, "text")
-		if cs {
-			return strings.Contains(name, text), fmt.Sprintf("%q contains %q", name, text)
-		}
-		return strings.Contains(strings.ToLower(name), strings.ToLower(text)), fmt.Sprintf("%q contains %q", name, text)
-	case "name.matches":
-		pat := strParam(p, "pattern")
-		return MatchGlob(pat, name, cs), fmt.Sprintf("%q matches %q", name, pat)
-	case "extension.in":
-		ext, _ := vars["file.ext"].(string)
-		for _, e := range toStrings(p["extensions"]) {
-			if strings.EqualFold(e, ext) {
-				return true, fmt.Sprintf("extension %q is listed", ext)
-			}
-		}
-		return false, fmt.Sprintf("extension %q is not listed", ext)
-	case "size.compare":
-		size, _ := vars["file.size"].(int64)
-		op := strParam(p, "operator")
-		b := numParam(p, "bytes")
-		return compareNum(op, float64(size), b), fmt.Sprintf("size %d %s %.0f", size, op, b)
-	case "path.matches":
-		rel, _ := vars["file.rel_path"].(string)
-		pat := strParam(p, "pattern")
-		return MatchGlob(pat, rel, cs), fmt.Sprintf("%q matches %q", rel, pat)
-	case "file.age":
-		age, _ := vars["file.age_days"].(int64)
-		op := strParam(p, "operator")
-		d := numParam(p, "days")
-		return compareNum(op, float64(age), d), fmt.Sprintf("age %d days %s %.0f", age, op, d)
-	case "date.compare":
-		field := strParam(p, "field")
-		t, _ := vars["file."+field].(time.Time)
-		ref, err := ParseDate(strParam(p, "date"))
-		if err != nil || t.IsZero() {
-			return false, "date unavailable"
-		}
-		op := strParam(p, "operator")
-		res := t.Before(ref)
-		if op == "after" {
-			res = t.After(ref)
-		}
-		return res, fmt.Sprintf("%s %s %s %s", field, t.Format(time.RFC3339), op, ref.Format(time.RFC3339))
-	case "variable.compare":
-		return compareVariable(p, vars)
-	case "group":
-		mode := strParam(p, "mode")
-		rules, _ := p["rules"].([]any)
-		if depth > MaxRuleDepth {
-			return false, "group nesting too deep"
-		}
-		var parts []string
-		for _, it := range rules {
-			m, _ := it.(map[string]any)
-			k, _ := m["kind"].(string)
-			rp, _ := m["params"].(map[string]any)
-			if rp == nil {
-				rp = map[string]any{}
-			}
-			ok, _ := evalCondition(k, rp, vars, depth+1)
-			parts = append(parts, fmt.Sprintf("%s=%v", k, ok))
-			if mode == "any" && ok {
-				return true, "any: " + strings.Join(parts, ", ")
-			}
-			if mode != "any" && !ok {
-				return false, "all: " + strings.Join(parts, ", ")
-			}
-		}
-		return mode != "any", mode + ": " + strings.Join(parts, ", ")
+	h := lookupHandlers(TypeCondition, kind)
+	if h.Eval == nil {
+		return false, "unknown condition"
 	}
-	return false, "unknown condition"
+	return h.Eval(p, vars, depth)
+}
+
+func condNameContains(p map[string]any, vars Vars, _ int) (bool, string) {
+	name, _ := vars["file.name"].(string)
+	text := strParam(p, "text")
+	if boolParam(p, "case_sensitive") {
+		return strings.Contains(name, text), fmt.Sprintf("%q contains %q", name, text)
+	}
+	return strings.Contains(strings.ToLower(name), strings.ToLower(text)), fmt.Sprintf("%q contains %q", name, text)
+}
+
+func condNameMatches(p map[string]any, vars Vars, _ int) (bool, string) {
+	name, _ := vars["file.name"].(string)
+	pat := strParam(p, "pattern")
+	return MatchGlob(pat, name, boolParam(p, "case_sensitive")), fmt.Sprintf("%q matches %q", name, pat)
+}
+
+func condExtensionIn(p map[string]any, vars Vars, _ int) (bool, string) {
+	ext, _ := vars["file.ext"].(string)
+	for _, e := range toStrings(p["extensions"]) {
+		if strings.EqualFold(e, ext) {
+			return true, fmt.Sprintf("extension %q is listed", ext)
+		}
+	}
+	return false, fmt.Sprintf("extension %q is not listed", ext)
+}
+
+func condSizeCompare(p map[string]any, vars Vars, _ int) (bool, string) {
+	size, _ := vars["file.size"].(int64)
+	op := strParam(p, "operator")
+	b := numParam(p, "bytes")
+	return compareNum(op, float64(size), b), fmt.Sprintf("size %d %s %.0f", size, op, b)
+}
+
+func condPathMatches(p map[string]any, vars Vars, _ int) (bool, string) {
+	rel, _ := vars["file.rel_path"].(string)
+	pat := strParam(p, "pattern")
+	return MatchGlob(pat, rel, boolParam(p, "case_sensitive")), fmt.Sprintf("%q matches %q", rel, pat)
+}
+
+func condFileAge(p map[string]any, vars Vars, _ int) (bool, string) {
+	age, _ := vars["file.age_days"].(int64)
+	op := strParam(p, "operator")
+	d := numParam(p, "days")
+	return compareNum(op, float64(age), d), fmt.Sprintf("age %d days %s %.0f", age, op, d)
+}
+
+func condDateCompare(p map[string]any, vars Vars, _ int) (bool, string) {
+	field := strParam(p, "field")
+	t, _ := vars["file."+field].(time.Time)
+	ref, err := ParseDate(strParam(p, "date"))
+	if err != nil || t.IsZero() {
+		return false, "date unavailable"
+	}
+	op := strParam(p, "operator")
+	res := t.Before(ref)
+	if op == "after" {
+		res = t.After(ref)
+	}
+	return res, fmt.Sprintf("%s %s %s %s", field, t.Format(time.RFC3339), op, ref.Format(time.RFC3339))
+}
+
+func condGroup(p map[string]any, vars Vars, depth int) (bool, string) {
+	mode := strParam(p, "mode")
+	rules, _ := p["rules"].([]any)
+	if depth > MaxRuleDepth {
+		return false, "group nesting too deep"
+	}
+	var parts []string
+	for _, it := range rules {
+		m, _ := it.(map[string]any)
+		k, _ := m["kind"].(string)
+		rp, _ := m["params"].(map[string]any)
+		if rp == nil {
+			rp = map[string]any{}
+		}
+		ok, _ := evalCondition(k, rp, vars, depth+1)
+		parts = append(parts, fmt.Sprintf("%s=%v", k, ok))
+		if mode == "any" && ok {
+			return true, "any: " + strings.Join(parts, ", ")
+		}
+		if mode != "any" && !ok {
+			return false, "all: " + strings.Join(parts, ", ")
+		}
+	}
+	return mode != "any", mode + ": " + strings.Join(parts, ", ")
 }
 
 func compareVariable(p map[string]any, vars Vars) (bool, string) {
@@ -490,72 +622,93 @@ func render(tpl string, vars Vars) string {
 }
 
 func applyAction(o *Outcome, n *Node, vars Vars, ev *Event) string {
-	p := n.Params
-	switch n.Kind {
-	case "sync.file":
-		if o.Decision != "skip" {
-			o.Decision = "sync"
-		}
-		return "file will be uploaded"
-	case "sync.skip":
-		o.Decision = "skip"
-		o.SkipReason = strParam(p, "reason")
-		if o.SkipReason == "" {
-			o.SkipReason = "skipped by automation " + strconv.Quote(o.AutomationName)
-		}
-		return o.SkipReason
-	case "dest.set_folder":
-		raw := strings.TrimSpace(render(strParam(p, "folder"), vars))
-		o.DestAbsolute = strings.HasPrefix(raw, "/") || strings.HasPrefix(raw, `\`)
-		o.DestFolder = pathutil.SanitizePath(raw)
-		return "destination folder " + o.DestFolder
-	case "dest.rename":
-		fallback, _ := vars["file.name"].(string)
-		o.DestName = pathutil.SanitizeName(render(strParam(p, "name"), vars), fallback)
-		return "destination name " + o.DestName
-	case "dest.create_folder":
-		raw := strings.TrimSpace(render(strParam(p, "folder"), vars))
-		folder := pathutil.SanitizePath(raw)
-		if !(strings.HasPrefix(raw, "/") || strings.HasPrefix(raw, `\`)) {
-			folder = pathutil.SanitizePath(ev.Destination + "/" + folder)
-		}
-		o.CreateFolders = appendOnce(o.CreateFolders, folder)
-		return "ensure folder " + folder
-	case "tag.apply":
-		var added []string
-		for _, t := range toStrings(p["tags"]) {
-			tag := strings.TrimSpace(render(t, vars))
-			if tag == "" {
-				continue
-			}
-			if len(tag) > 64 {
-				tag = tag[:64]
-			}
-			o.Tags = appendOnce(o.Tags, tag)
-			added = append(added, tag)
-		}
-		return "tags " + strings.Join(added, ", ")
-	case "sync.start_task":
-		cfg := strParam(p, "config")
-		o.StartTasks = appendOnce(o.StartTasks, cfg)
-		return "queue sync configuration " + strconv.Quote(cfg)
-	case "notify.send":
-		nt := Notification{
-			Title:   render(strParam(p, "title"), vars),
-			Message: render(strParam(p, "message"), vars),
-			Level:   strParam(p, "level"),
-			Channel: strParam(p, "channel"),
-		}
-		if nt.Level == "" {
-			nt.Level = "info"
-		}
-		if nt.Channel == "" {
-			nt.Channel = "both"
-		}
-		o.Notifications = append(o.Notifications, nt)
-		return "notify: " + nt.Title
+	h := lookupHandlers(TypeAction, n.Kind)
+	if h.Apply == nil {
+		return ""
 	}
-	return ""
+	first := len(o.Ops)
+	detail := h.Apply(o, n, vars, ev)
+	markApproval(o.Ops[first:], n)
+	return detail
+}
+
+func actSyncFile(o *Outcome, _ *Node, _ Vars, _ *Event) string {
+	if o.Decision != "skip" {
+		o.Decision = "sync"
+	}
+	return "file will be uploaded"
+}
+
+func actSyncSkip(o *Outcome, n *Node, _ Vars, _ *Event) string {
+	o.Decision = "skip"
+	o.SkipReason = strParam(n.Params, "reason")
+	if o.SkipReason == "" {
+		o.SkipReason = "skipped by automation " + strconv.Quote(o.AutomationName)
+	}
+	return o.SkipReason
+}
+
+func actSetFolder(o *Outcome, n *Node, vars Vars, _ *Event) string {
+	raw := strings.TrimSpace(render(strParam(n.Params, "folder"), vars))
+	o.DestAbsolute = strings.HasPrefix(raw, "/") || strings.HasPrefix(raw, `\`)
+	o.DestFolder = pathutil.SanitizePath(raw)
+	return "destination folder " + o.DestFolder
+}
+
+func actRename(o *Outcome, n *Node, vars Vars, _ *Event) string {
+	fallback, _ := vars["file.name"].(string)
+	o.DestName = pathutil.SanitizeName(render(strParam(n.Params, "name"), vars), fallback)
+	return "destination name " + o.DestName
+}
+
+func actCreateFolder(o *Outcome, n *Node, vars Vars, ev *Event) string {
+	raw := strings.TrimSpace(render(strParam(n.Params, "folder"), vars))
+	folder := pathutil.SanitizePath(raw)
+	if !(strings.HasPrefix(raw, "/") || strings.HasPrefix(raw, `\`)) {
+		folder = pathutil.SanitizePath(ev.Destination + "/" + folder)
+	}
+	o.CreateFolders = appendOnce(o.CreateFolders, folder)
+	return "ensure folder " + folder
+}
+
+func actTagApply(o *Outcome, n *Node, vars Vars, _ *Event) string {
+	var added []string
+	for _, t := range toStrings(n.Params["tags"]) {
+		tag := strings.TrimSpace(render(t, vars))
+		if tag == "" {
+			continue
+		}
+		if len(tag) > 64 {
+			tag = tag[:64]
+		}
+		o.Tags = appendOnce(o.Tags, tag)
+		added = append(added, tag)
+	}
+	return "tags " + strings.Join(added, ", ")
+}
+
+func actStartTask(o *Outcome, n *Node, _ Vars, _ *Event) string {
+	cfg := strParam(n.Params, "config")
+	o.StartTasks = appendOnce(o.StartTasks, cfg)
+	return "queue sync configuration " + strconv.Quote(cfg)
+}
+
+func actNotify(o *Outcome, n *Node, vars Vars, _ *Event) string {
+	p := n.Params
+	nt := Notification{
+		Title:   render(strParam(p, "title"), vars),
+		Message: render(strParam(p, "message"), vars),
+		Level:   strParam(p, "level"),
+		Channel: strParam(p, "channel"),
+	}
+	if nt.Level == "" {
+		nt.Level = "info"
+	}
+	if nt.Channel == "" {
+		nt.Channel = "both"
+	}
+	o.Notifications = append(o.Notifications, nt)
+	return "notify: " + nt.Title
 }
 
 // Named pairs an automation with its storage id.
@@ -575,7 +728,9 @@ type Plan struct {
 	StartTasks    []string       `json:"start_tasks,omitempty"`
 	Notifications []Notification `json:"notifications,omitempty"`
 	Conflicts     []string       `json:"conflicts,omitempty"`
-	Outcomes      []Outcome      `json:"outcomes"`
+	// Ops merges the ops of every triggered outcome (see MergeOps).
+	Ops      []Op      `json:"ops,omitempty"`
+	Outcomes []Outcome `json:"outcomes"`
 }
 
 // EvaluateAll evaluates every enabled automation and merges the outcomes.
@@ -644,6 +799,7 @@ func EvaluateAll(list []Named, ev *Event) Plan {
 			plan.StartTasks = appendOnce(plan.StartTasks, s)
 		}
 		plan.Notifications = append(plan.Notifications, o.Notifications...)
+		plan.Ops = MergeOps(plan.Ops, o.Ops)
 	}
 	if explicit != "" {
 		plan.Decision = explicit

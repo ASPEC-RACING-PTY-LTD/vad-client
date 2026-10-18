@@ -369,3 +369,18 @@ The server never edits the host `.env`. Only `install.sh` does.
   - Removed: managed-metadata listing upload, `client_only` destination credentials, `encryption_mode`.
   - Added: §5A key exchange, `escrow_mode`, server-side browse and download under full escrow, encrypted catalog with blind-index search, two-way sync (§10), modules (§6A), profiles and consent (§6B), env management (§11A), superuser (§11B), generic OpenAI-compatible AI, and the new error codes and flags.
   - Rev 1.0 was never implemented.
+- **Rev 1.1a (2026-10-18, INT), clarification only.** Wherever this file says "as rev 1.0", the normative text is [history/api-v1-rev1.0.md](history/api-v1-rev1.0.md) (restored verbatim), except where rev 1.1 changes or removes it. Shapes defined in neither revision are implementer choices recorded in the SUBAGENT reports and reconciled by INT.
+  - Job schedule `weekdays` use ISO numbering: 1 = Monday … 7 = Sunday. `interval` schedules are anchored to the Unix epoch. `cron` is the standard 5-field form. Missed-run grace is 5 minutes (implemented in `sdk/schedule`).
+  - Restore: `target_profile_sid` (rev 1.1) takes precedence over rev 1.0 `target_user.sid` when both are present.
+- **Rev 1.1b (2026-10-18, INT), Phase 1 resolutions.** Additive only.
+  - **Built-in server destination.** The server keeps one built-in destination row (`kind='server'`, `scope='global'`, localfs under `<default storage>/backup/`), created on demand. `POST /repos` with `destination_id` omitted or `0` uses it.
+  - **Config replace.** A config PUT whose content differs from the stored config replaces it atomically and returns `201`; identical content returns `200`. The caller must hold an unexpired exclusive lock on the repo (checked against the calling device), else `409 repo_locked`.
+  - **Object hash.** For every kind except `config`, a body whose SHA-256 differs from the oid is `422 object_hash_mismatch`; transport-level body/header mismatches stay `400 body_mismatch`.
+  - **Locks.** Refreshing or releasing an unknown or expired lock returns `404 lock_not_found`.
+  - **Objects.** There is no object DELETE route; garbage collection is server-side (§9).
+  - **SIK fingerprint.** Uppercase hex of the first 16 bytes of `SHA-256(sik_pub)`, in 8 groups of 4 joined by `-`. Clients compare case-insensitively, ignoring `:`, `-` and spaces.
+  - **`POST /admin/keys/rotate-server`** rotates the SEK only (operation kind `rotate_keys`); retired SEKs stay openable by version. SIK rotation is deferred. `key_audit` is store-only in v1.
+  - **`key_share`** (metadata escrow) payload adds `target_sign_pub`: the target device's VD1 Ed25519 public key, which is also its snapshot signing key (`device.sign_pub`).
+  - **`rewrap {repo_id, epoch}`**: rotate to `epoch` when the repo is at `epoch-1`; report done when already at or past it. Revoked devices are excluded using the device's own view of revoked devices.
+  - **Issue classes.** Desktop-local reasons `efs_needs_logon` and `profile_needs_logon` are reported as `access_denied` and `other` with the reason in `detail`.
+  - **Issue routes.** `GET /backup/runs/{id}/issues`, `POST …/issues/skip` and `POST …/retry-skipped` accept sessions and device signatures (`user` auth). A device may act only on its own device's runs; others get `404`.

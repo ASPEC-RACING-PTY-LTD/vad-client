@@ -11,7 +11,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"path/filepath"
 	"sort"
@@ -20,11 +19,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"golang.org/x/time/rate"
-
 	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/config"
 	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/filter"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/outbox"
 	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/state"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/transfer"
 	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/automation"
 	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/client"
 )
@@ -55,10 +54,10 @@ type runStats struct {
 
 // Engine coordinates scanning, watching and uploading.
 type Engine struct {
-	st      *state.Store
-	log     *slog.Logger
-	ctrl    *Controller
-	hashSem chan struct{}
+	st   *state.Store
+	log  *slog.Logger
+	xfer *transfer.Core
+	ctrl *Controller // == xfer.Controller()
 
 	mu           sync.Mutex
 	client       *client.Client
@@ -78,13 +77,12 @@ type Engine struct {
 	runs         map[string]*runStats
 	reports      []client.TransferReport
 	notes        []client.NotificationReport
+	outbox       *outbox.Outbox // durable report outbox; see reportOutbox
 	lastStart    map[string]time.Time
-	scheduleLast map[string]time.Time
 	dedupe       map[string]time.Time
 	removed      map[string]map[string]removal // config -> size|mtime -> removal
 	netFailures  int
 	offlineUntil time.Time
-	limiter      *rate.Limiter
 	notify       bool
 	session      struct {
 		completed int
@@ -107,11 +105,12 @@ type removal struct {
 }
 
 func New(st *state.Store, log *slog.Logger, deviceName string) *Engine {
+	xfer := transfer.New(32, 2)
 	return &Engine{
-		st: st, log: log, ctrl: NewController(32), hashSem: make(chan struct{}, 2), deviceName: deviceName,
+		st: st, log: log, xfer: xfer, ctrl: xfer.Controller(), deviceName: deviceName,
 		configs: map[string]*config.SyncConfig{}, filters: map[string]*filter.Filter{}, watchers: map[string]*watcher{},
 		scanning: map[string]bool{}, lastScan: map[string]time.Time{}, lastErr: map[string]string{}, active: map[int64]*activeTransfer{},
-		runs: map[string]*runStats{}, lastStart: map[string]time.Time{}, scheduleLast: map[string]time.Time{}, dedupe: map[string]time.Time{},
+		runs: map[string]*runStats{}, lastStart: map[string]time.Time{}, dedupe: map[string]time.Time{},
 		removed: map[string]map[string]removal{}, status: "idle", wake: make(chan struct{}, 1), notify: true,
 	}
 }
@@ -126,6 +125,9 @@ func NewID() string {
 // Start loads configurations and starts background work.
 func (e *Engine) Start(parent context.Context) error {
 	e.ctx, e.cancel = context.WithCancel(parent)
+	// The report outbox is flushed by timerLoop (flushReports) while the
+	// engine runs and stops with it.
+	e.reportOutbox()
 	cfgs, err := e.st.Configs()
 	if err != nil {
 		return err
@@ -183,12 +185,11 @@ func (e *Engine) SetClient(c *client.Client, me *client.Me) {
 	e.mu.Lock()
 	e.client = c
 	if c != nil {
-		c.ChunkBody = e.wrapBody
-		if me != nil && me.Server.MaxConcurrentChunks > 0 {
-			e.ctrl.mu.Lock()
-			e.ctrl.max = clamp(min(e.ctrl.max, me.Server.MaxConcurrentChunks), 1, absoluteMax)
-			e.ctrl.mu.Unlock()
+		serverMax := 0
+		if me != nil {
+			serverMax = me.Server.MaxConcurrentChunks
 		}
+		e.xfer.Attach(c, serverMax)
 		e.netFailures = 0
 		e.offlineUntil = time.Time{}
 	}
@@ -205,14 +206,8 @@ func (e *Engine) ApplySettings(s config.Settings) {
 	if s.ConcurrencyMode == "manual" {
 		manual = s.ManualParallel
 	}
-	e.ctrl.SetBounds(s.MaxParallel, manual)
+	e.xfer.ApplySettings(transfer.Settings{MaxParallel: s.MaxParallel, ManualParallel: manual, BandwidthKBps: s.BandwidthKBps})
 	e.mu.Lock()
-	if s.BandwidthKBps > 0 {
-		bps := rate.Limit(s.BandwidthKBps * 1024)
-		e.limiter = rate.NewLimiter(bps, max(256<<10, s.BandwidthKBps*1024))
-	} else {
-		e.limiter = nil
-	}
 	e.notify = s.Notifications
 	e.paused = s.Paused
 	e.mu.Unlock()
@@ -385,32 +380,6 @@ func (e *Engine) RetryFailed(id int64) (int64, error) {
 	n, err := e.st.RetryFailed(id)
 	e.kick()
 	return n, err
-}
-
-// --- bandwidth and progress ---
-
-// limitedReader applies the optional upload bandwidth limit.
-type limitedReader struct {
-	r io.Reader
-	e *Engine
-}
-
-func (l *limitedReader) Read(p []byte) (int, error) {
-	l.e.mu.Lock()
-	lim := l.e.limiter
-	l.e.mu.Unlock()
-	if lim != nil && len(p) > 64<<10 {
-		p = p[:64<<10]
-	}
-	n, err := l.r.Read(p)
-	if n > 0 && lim != nil {
-		_ = lim.WaitN(context.Background(), min(n, lim.Burst()))
-	}
-	return n, err
-}
-
-func (e *Engine) wrapBody(r io.Reader) io.Reader {
-	return &limitedReader{r: r, e: e}
 }
 
 // --- snapshot ---

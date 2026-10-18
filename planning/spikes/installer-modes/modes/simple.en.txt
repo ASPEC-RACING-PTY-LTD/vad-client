@@ -1,0 +1,40 @@
+SIMPLE FOLDER BACKUPS
+
+What it does
+- You choose folders, for example Documents, Desktop or Pictures.
+- VaultDock backs them up automatically on a schedule to your VaultDock server.
+- You can browse your backed-up files and restore any file or folder,
+  including older versions.
+
+Scope (what it touches)
+- Only the folders you pick, inside your own Windows profile.
+- Files are read as you, with your normal Windows permissions. VaultDock
+  cannot read files that you yourself could not open.
+- Other people's profiles on this PC are never included.
+- Windows system folders and program folders are always off limits.
+
+Permissions
+- Installing needs administrator rights once, because VaultDock adds a small
+  background service that keeps backups running when the window is closed.
+- The service gets only the few Windows privileges it needs to act on your
+  behalf. It does not get "backup operator" rights, so it cannot read
+  locked or protected system files.
+- Files are encrypted on this PC before they are uploaded.
+
+Resources
+- Download and disk: only the core app (no extra components).
+- Background use: low CPU and disk activity while a backup runs; idle
+  otherwise.
+- Some free disk space for a temporary upload queue.
+- Network: uploads go only to the VaultDock server you connect to.
+
+Compared with Full Access (Advanced)
+- Simple has no sync, no automations, no app or game discovery, no app
+  reinstall, no registry/settings backup, no snapshots of locked files and no
+  protection of other Windows profiles.
+- Files that are open and locked by another program (for example an open
+  Outlook data file) may be skipped and retried later.
+
+Changing your mind
+- You can switch to Full Access later in Settings > Mode. You do not need to
+  reinstall, and your backups and settings are kept.

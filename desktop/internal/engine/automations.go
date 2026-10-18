@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/config"
@@ -40,16 +41,7 @@ func (e *Engine) refreshAutomations() {
 		e.log.Warn("could not refresh automations", "err", err)
 		return
 	}
-	var named []automation.Named
-	for _, a := range list {
-		// Validate locally as well: the client never runs anything the
-		// shared validator rejects.
-		parsed, res := automation.Parse(a.Definition)
-		if parsed == nil || !res.Valid() || !parsed.Enabled {
-			continue
-		}
-		named = append(named, automation.Named{ID: strconv.FormatInt(a.ID, 10), Automation: parsed})
-	}
+	named := e.activeAutomations(list)
 	e.mu.Lock()
 	e.autos = named
 	e.autosLoaded = time.Now()
@@ -70,15 +62,45 @@ func (e *Engine) LoadCachedAutomations() {
 	if json.Unmarshal([]byte(raw), &list) != nil {
 		return
 	}
-	var named []automation.Named
-	for _, a := range list {
-		if parsed, res := automation.Parse(a.Definition); parsed != nil && res.Valid() && parsed.Enabled {
-			named = append(named, automation.Named{ID: strconv.FormatInt(a.ID, 10), Automation: parsed})
-		}
-	}
+	named := e.activeAutomations(list)
 	e.mu.Lock()
 	e.autos = named
 	e.mu.Unlock()
+}
+
+// activeAutomations parses and validates automations locally: the client
+// never runs anything the shared validator rejects. Invalid ones are logged
+// and recorded as issues (B4); disabled ones are skipped quietly.
+func (e *Engine) activeAutomations(list []client.RemoteAutomation) []automation.Named {
+	var named []automation.Named
+	for _, a := range list {
+		id := strconv.FormatInt(a.ID, 10)
+		parsed, res := automation.Parse(a.Definition)
+		if parsed == nil || !res.Valid() {
+			msg := "automation " + strconv.Quote(a.Name) + " is invalid"
+			if res != nil && len(res.Errors) > 0 {
+				first := res.Errors[0]
+				msg += ": " + first.Path + ": " + first.Message
+			}
+			if e.log != nil {
+				e.log.Warn("automation: invalid, not applied", "automation", id, "name", a.Name, "errors", errCount(res), "detail", msg)
+			}
+			e.recordIssue(issueSourceAutomation, "", id, issueInvalid, msg)
+			continue
+		}
+		if !parsed.Enabled {
+			continue
+		}
+		named = append(named, automation.Named{ID: id, Automation: parsed})
+	}
+	return named
+}
+
+func errCount(res *automation.ValidationResult) int {
+	if res == nil {
+		return 0
+	}
+	return len(res.Errors)
 }
 
 // Automations lists the automations currently active on this device.
@@ -239,21 +261,7 @@ func (e *Engine) runSchedules() {
 			if mins < 5 {
 				continue
 			}
-			key := a.ID + "/" + n.ID
-			e.mu.Lock()
-			last, ok := e.scheduleLast[key]
-			if !ok {
-				// first sighting: start the interval now instead of firing on startup
-				e.scheduleLast[key] = now
-				e.mu.Unlock()
-				continue
-			}
-			due := now.Sub(last) >= time.Duration(mins)*time.Minute
-			if due {
-				e.scheduleLast[key] = now
-			}
-			e.mu.Unlock()
-			if !due {
+			if !e.scheduleDue(a.ID+"/"+n.ID, now, time.Duration(mins)*time.Minute) {
 				continue
 			}
 			ev := &automation.Event{Type: automation.EventScheduleTick, TriggerNodeID: n.ID, Device: e.deviceName, Now: now, Destination: "/"}
@@ -261,4 +269,34 @@ func (e *Engine) runSchedules() {
 			e.applySideEffects(&config.SyncConfig{Name: "schedule", Destination: "/"}, plan, 0)
 		}
 	}
+}
+
+// scheduleMu serialises read-modify-write of schedule state.
+var scheduleMu sync.Mutex
+
+// scheduleDue reports whether a schedule trigger is due and, if so, records
+// now as its last fire time. The time is kept in state.db so restarts
+// neither re-fire nor skip runs (B3). A trigger seen for the first time
+// starts its interval now instead of firing on startup. On a database error
+// the tick is skipped rather than risk repeated firing.
+func (e *Engine) scheduleDue(key string, now time.Time, every time.Duration) bool {
+	scheduleMu.Lock()
+	defer scheduleMu.Unlock()
+	lastMS, ok, err := e.st.ScheduleLast(key)
+	if err != nil {
+		e.log.Warn("automation: could not read schedule state", "key", key, "err", err)
+		return false
+	}
+	last := time.UnixMilli(lastMS)
+	due := ok && now.Sub(last) >= every
+	if ok && !due && !last.After(now) {
+		return false
+	}
+	// First sighting, due, or a last fire in the future (clock moved back):
+	// record now as the start of the next interval.
+	if err := e.st.SetScheduleLast(key, now.UnixMilli()); err != nil {
+		e.log.Warn("automation: could not save schedule state", "key", key, "err", err)
+		return false
+	}
+	return due
 }

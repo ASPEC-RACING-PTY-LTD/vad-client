@@ -1,7 +1,14 @@
 name: Release
 
-# Push a tag such as v1.2.0 to publish a release. Desktop apps, the
-# vaultdock.dev download page and `install.sh upgrade` all pick it up from here.
+# Push a tag such as v1.2.0 to publish a client release to GitHub Releases of
+# ASPEC-RACING-PTY-LTD/VaultDock. The desktop updater picks it up from there.
+# The server image and install.sh are released from ASPEC-RACING-PTY-LTD/vad-server.
+#
+# Optional secrets (each step is skipped with a notice when its secret is unset):
+#   WINDOWS_CERT_PFX       base64 of a code-signing .pfx (Authenticode, O4)
+#   WINDOWS_CERT_PASSWORD  password of that .pfx (may be empty)
+#   RELEASE_MANIFEST_KEY   Ed25519 private key, PKCS#8 PEM (`openssl genpkey
+#                          -algorithm ed25519`), for the component manifest (D29)
 on:
   push:
     tags: ['v[0-9]+.[0-9]+.[0-9]+*']
@@ -22,56 +29,14 @@ env:
   TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
-  # The server image and the Windows app build in parallel.
-  server-image:
-    name: Server image (amd64 + arm64)
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          ref: ${{ env.TAG }}
-      - name: Version
-        id: v
-        run: |
-          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
-          echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/metadata-action@v5
-        id: meta
-        with:
-          images: ${{ steps.v.outputs.image }}
-          tags: |
-            type=semver,pattern={{version}},value=${{ env.TAG }}
-            type=semver,pattern={{major}}.{{minor}},value=${{ env.TAG }}
-            type=raw,value=latest,enable=${{ !contains(env.TAG, '-') }}
-      # Build stages cross-compile natively (see Dockerfile), so arm64 needs no emulation.
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          build-args: VERSION=${{ steps.v.outputs.version }}
-          cache-from: type=gha,scope=server-image
-          cache-to: type=gha,scope=server-image,mode=max
-          provenance: false
-
   desktop:
-    name: Windows app
+    name: Windows installer
     runs-on: windows-latest
     timeout-minutes: 30
     env:
       WAILS_VERSION: v2.16.0
+      # Secrets cannot be used in `if:` directly; expose only whether one is set.
+      HAS_CERT: ${{ secrets.WINDOWS_CERT_PFX != '' }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -84,7 +49,7 @@ jobs:
         with:
           go-version-file: desktop/go.mod
           cache-dependency-path: |
-            go.sum
+            sdk/go.sum
             desktop/go.sum
       - uses: actions/setup-node@v5
         with:
@@ -103,8 +68,8 @@ jobs:
       - name: Ensure NSIS
         shell: pwsh
         run: |
+          $nsis = 'C:\Program Files (x86)\NSIS'
           if (-not (Get-Command makensis -ErrorAction SilentlyContinue)) {
-            $nsis = 'C:\Program Files (x86)\NSIS'
             if (-not (Test-Path "$nsis\makensis.exe")) { choco install nsis -y --no-progress }
             Add-Content $env:GITHUB_PATH $nsis
           }
@@ -123,6 +88,34 @@ jobs:
       - name: Build installer
         working-directory: desktop
         run: wails build -s -skipbindings -clean -nsis -trimpath -ldflags "-s -w -X main.version=${{ steps.v.outputs.version }}"
+      # Authenticode (O4): disabled until a certificate is supplied. When the
+      # secret exists, sign the app, repackage the installer around the signed
+      # binary with the same NSIS script Wails used, then sign the installer.
+      - name: Signing disabled
+        if: env.HAS_CERT != 'true'
+        shell: bash
+        run: echo "::notice::WINDOWS_CERT_PFX is not set; the Windows build is unsigned."
+      - name: Sign app and installer
+        if: env.HAS_CERT == 'true'
+        shell: pwsh
+        env:
+          WINDOWS_CERT_PFX: ${{ secrets.WINDOWS_CERT_PFX }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = (Resolve-Path desktop/build/bin/VaultDock.exe).Path
+          ./scripts/sign.ps1 $exe
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          Get-ChildItem desktop/build/bin -Filter '*-amd64-setup.exe' | Remove-Item
+          Push-Location desktop/build/windows/installer
+          makensis -V2 "-DARG_WAILS_AMD64_BINARY=$exe" project.nsi
+          $rc = $LASTEXITCODE
+          Pop-Location
+          if ($rc) { exit $rc }
+          $setup = Get-ChildItem desktop/build/bin -Filter '*-amd64-setup.exe' | Select-Object -First 1
+          if (-not $setup) { throw 'installer not found after repackaging' }
+          ./scripts/sign.ps1 $setup.FullName
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - name: Collect installer
         shell: bash
         run: |
@@ -140,16 +133,56 @@ jobs:
 
   publish:
     name: Publish release
-    needs: [server-image, desktop]
+    needs: [desktop]
+    # Only the official repository publishes; forks and mirrors do not.
+    if: github.repository == 'ASPEC-RACING-PTY-LTD/VaultDock'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: write
+    env:
+      HAS_MANIFEST_KEY: ${{ secrets.RELEASE_MANIFEST_KEY != '' }}
     steps:
       - uses: actions/download-artifact@v4
         with:
           name: desktop
           path: assets
+      # Component manifest (sdk/modules, manifest_version 1). No downloadable
+      # components (vss, discovery, reinstall) exist yet, so this is a valid
+      # placeholder with an empty list; later releases add entries here.
+      - name: Component manifest
+        id: manifest
+        working-directory: assets
+        run: |
+          v="${TAG#v}"
+          f="components-$v.json"
+          printf '{\n  "manifest_version": 1,\n  "release": "%s",\n  "components": []\n}\n' "$v" > "$f"
+          echo "file=$f" >> "$GITHUB_OUTPUT"
+          cat "$f"
+      # D29: detached Ed25519 signature over the exact manifest bytes
+      # (components-<v>.json.sig, base64), checked by modules.VerifyManifest.
+      - name: Manifest signing disabled
+        if: env.HAS_MANIFEST_KEY != 'true'
+        run: echo "::notice::RELEASE_MANIFEST_KEY is not set; the component manifest is unsigned (SHA-256 only)."
+      - name: Sign component manifest
+        if: env.HAS_MANIFEST_KEY == 'true'
+        working-directory: assets
+        env:
+          RELEASE_MANIFEST_KEY: ${{ secrets.RELEASE_MANIFEST_KEY }}
+          MANIFEST: ${{ steps.manifest.outputs.file }}
+        run: |
+          set -euo pipefail
+          umask 077
+          key="$RUNNER_TEMP/manifest-key.pem"
+          trap 'rm -f "$key" "$RUNNER_TEMP/manifest.sig" "$RUNNER_TEMP/manifest-pub.pem"' EXIT
+          printf '%s\n' "$RELEASE_MANIFEST_KEY" > "$key"
+          openssl pkeyutl -sign -rawin -inkey "$key" -in "$MANIFEST" -out "$RUNNER_TEMP/manifest.sig"
+          openssl pkey -in "$key" -pubout -out "$RUNNER_TEMP/manifest-pub.pem"
+          openssl pkeyutl -verify -rawin -pubin -inkey "$RUNNER_TEMP/manifest-pub.pem" \
+            -in "$MANIFEST" -sigfile "$RUNNER_TEMP/manifest.sig"
+          base64 -w0 "$RUNNER_TEMP/manifest.sig" > "$MANIFEST.sig"
+          echo "Signed $MANIFEST with public key:"
+          cat "$RUNNER_TEMP/manifest-pub.pem"
       - name: Checksums
         working-directory: assets
         run: sha256sum -- * > SHA256SUMS && cat SHA256SUMS

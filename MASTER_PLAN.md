@@ -354,7 +354,7 @@ Normative definition: [backup-format-v1.md §3–§5](sdk/contracts/backup-forma
 | Key material | `DK` (dedup, chunker, keyed file hash, config MAC), never rotated in v1. `RMK_e` per epoch → `K_data_e`, `K_meta_e` |
 | Recipients | Device X25519 (`box_priv` machine-scope DPAPI in `%ProgramData%\VaultDock\keys`, ACL SYSTEM/Admins); server escrow SEK; recovery (asymmetric, derived from the 32-byte recovery secret); optional passphrase (Argon2id-derived) |
 | Exchange at registration | The device sends `box_pub` at enrolment. On approval it receives and **pins** the SIK fingerprint (shown with the verification code on both screens) and the SIK-signed SEK pub. First device: creates `DK`/`RMK_1`, the wraps and the recovery key. Later devices: the server re-wraps under full escrow (in memory only), or an existing device or the recovery key does it under metadata escrow |
-| Storage | Client: DPAPI machine scope plus a file ACL. Server: KEK file outside the DB (Docker secret or `/state/keys/master.key` 0600, created by `install.sh`); SIK/SEK private keys sealed by the KEK; catalog per-user DEKs sealed by the KEK; destination credentials and AI keys under the existing `internal/secrets` envelope with the KEK |
+| Storage | Client: DPAPI machine scope plus a file ACL. Server: KEK file outside the DB (Docker secret or `VAULTDOCK_KEK_FILE`, default `/state/keys/kek`, 0600, created by `install.sh`); SIK/SEK private keys sealed by the KEK; catalog per-user DEKs sealed by the KEK; destination credentials and AI keys under the existing `internal/secrets` envelope with the KEK |
 | Rotation | Epoch rotation on device revocation (automatic), escrow-mode change, SEK rotation, manual request, or the yearly policy. Backward chain; no re-encryption of old data by default. SIK rotation is signed by the old SIK, and devices accept it automatically only with a valid chain. SEK rotation re-wraps the current epoch |
 | Recovery | (a) Server alive: a new device is approved, then key share. (b) Server gone, repository copy available: `vaultdock-restore` plus the recovery key or passphrase. (c) Recovery key lost, server alive, full escrow: the server can re-wrap to a new device after normal device approval. (d) Server KEK lost: escrow is unusable, the recovery key still works. **The KEK backup is a mandatory step in `install.sh` and is shown in the admin readiness view** |
 | Server-side decryption audit | Every unwrap operation is logged (`key_audit`: repo, purpose, actor, time) and visible to the repository owner |
@@ -608,11 +608,11 @@ As r2 (WEB-0 foundation, registry, feature folders), plus:
 
 ### 7.14 Code signing and release integrity (O4, D29)
 
-- `scripts/sign.ps1` and release-workflow steps run **only if** the `WINDOWS_SIGNING_CERT` secret (or a cloud signing configuration) exists. Otherwise they are skipped with a notice.
+- `scripts/sign.ps1` and release-workflow steps run **only if** the `WINDOWS_CERT_PFX` secret (base64 .pfx; password in the optional `WINDOWS_CERT_PASSWORD`) or a cloud signing configuration exists. Otherwise they are skipped with a notice.
 - The updater and the module manager:
   - always verify SHA-256 from `SHA256SUMS` / the component manifest;
   - if the installed core is Authenticode-signed, require the same publisher on updates and components;
-  - if D29's Ed25519 manifest signing is approved, verify the manifest signature with the embedded public key (the key is kept offline or in GitHub secrets).
+  - if D29's Ed25519 manifest signing is approved, verify the manifest signature with the embedded public key (the private key is kept offline or in the `RELEASE_MANIFEST_KEY` GitHub secret, an Ed25519 PKCS#8 PEM; the release workflow writes a detached `components-<v>.json.sig` only when it is set).
 - The NSIS installer and the uninstaller are signed when a certificate exists.
 
 ### 7.15 Licensing and third-party code (O5, O7, D30)

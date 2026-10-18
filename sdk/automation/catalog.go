@@ -1,7 +1,5 @@
 package automation
 
-import "sort"
-
 // Contexts describe what data an event carries.
 const (
 	CtxFile     = "file"     // a single local file or folder event
@@ -39,22 +37,6 @@ type ParamSpec struct {
 	Templated bool `json:"templated,omitempty"`
 }
 
-// KindSpec describes a trigger, condition or action kind.
-type KindSpec struct {
-	Type        string      `json:"type"`
-	Kind        string      `json:"kind"`
-	Title       string      `json:"title"`
-	Description string      `json:"description"`
-	Category    string      `json:"category"`
-	Params      []ParamSpec `json:"params"`
-	// Context is the event context a trigger produces.
-	Context string `json:"context,omitempty"`
-	// Contexts lists the contexts a condition or action can be used in.
-	Contexts []string `json:"contexts,omitempty"`
-	// Ports lists the output ports of the node.
-	Ports []string `json:"ports"`
-}
-
 func f(v float64) *float64 { return &v }
 
 var configsParam = ParamSpec{
@@ -65,45 +47,51 @@ var configsParam = ParamSpec{
 
 var negateParam = ParamSpec{Name: "negate", Type: PTBoolean, Default: false, Description: "Invert the result of the condition."}
 
+// Module sets required by the built-in kinds.
+var (
+	modsAutomation = []string{ModuleAutomation}
+	modsSync       = []string{ModuleAutomation, ModuleSync}
+)
+
 var compareOps = []string{"gt", "gte", "lt", "lte", "eq"}
 
 var triggers = []KindSpec{
-	{Kind: "file.created", Title: "File created", Category: "File events", Context: CtxFile,
+	{Kind: "file.created", Title: "File created", Category: "File events", Context: CtxFile, RequiredModules: modsSync,
 		Description: "A new file appeared in a synchronised folder (fires once the file has stopped changing).",
 		Params:      []ParamSpec{configsParam}},
-	{Kind: "file.modified", Title: "File modified", Category: "File events", Context: CtxFile,
+	{Kind: "file.modified", Title: "File modified", Category: "File events", Context: CtxFile, RequiredModules: modsSync,
 		Description: "An existing synchronised file changed size or modification time.",
 		Params:      []ParamSpec{configsParam}},
-	{Kind: "file.renamed", Title: "File renamed", Category: "File events", Context: CtxFile,
+	{Kind: "file.renamed", Title: "File renamed", Category: "File events", Context: CtxFile, RequiredModules: modsSync,
 		Description: "A file was renamed or moved inside a synchronised folder. file.old_path holds the previous relative path.",
 		Params:      []ParamSpec{configsParam}},
-	{Kind: "file.deleted", Title: "File deleted", Category: "File events", Context: CtxFile,
+	{Kind: "file.deleted", Title: "File deleted", Category: "File events", Context: CtxFile, RequiredModules: modsSync,
 		Description: "A file was removed locally. Server copies are never deleted by this trigger; use it for notifications or tagging.",
 		Params:      []ParamSpec{configsParam}},
-	{Kind: "folder.changed", Title: "Folder changed", Category: "File events", Context: CtxFile,
+	{Kind: "folder.changed", Title: "Folder changed", Category: "File events", Context: CtxFile, RequiredModules: modsSync,
 		Description: "Any file event inside a folder whose relative path matches the pattern.",
 		Params: []ParamSpec{
 			{Name: "folder", Type: PTGlob, Required: false, Default: "**", Description: "Glob matched against the folder's path relative to the sync root (\"\" is the root).", Example: "Valorant/**"},
 			configsParam,
 		}},
-	{Kind: "schedule.interval", Title: "Scheduled interval", Category: "Time", Context: CtxSchedule,
+	{Kind: "schedule.interval", Title: "Scheduled interval", Category: "Time", Context: CtxSchedule, RequiredModules: modsAutomation,
 		Description: "Fires repeatedly on the desktop client at a fixed interval.",
 		Params: []ParamSpec{
 			{Name: "every_minutes", Type: PTInteger, Required: true, Min: f(5), Max: f(10080), Description: "Interval in minutes (5 minutes to 7 days).", Example: 60},
 		}},
-	{Kind: "sync.completed", Title: "Synchronisation completed", Category: "Sync events", Context: CtxSync,
+	{Kind: "sync.completed", Title: "Synchronisation completed", Category: "Sync events", Context: CtxSync, RequiredModules: modsSync,
 		Description: "A sync run finished with no failed transfers.",
 		Params:      []ParamSpec{configsParam}},
-	{Kind: "sync.failed", Title: "Synchronisation failed", Category: "Sync events", Context: CtxSync,
+	{Kind: "sync.failed", Title: "Synchronisation failed", Category: "Sync events", Context: CtxSync, RequiredModules: modsSync,
 		Description: "A sync run finished with one or more failed transfers, or could not run.",
 		Params:      []ParamSpec{configsParam}},
-	{Kind: "file.size_threshold", Title: "File size threshold reached", Category: "File events", Context: CtxFile,
+	{Kind: "file.size_threshold", Title: "File size threshold reached", Category: "File events", Context: CtxFile, RequiredModules: modsSync,
 		Description: "A file was created or modified and is at least the given size.",
 		Params: []ParamSpec{
 			{Name: "bytes", Type: PTBytes, Required: true, Description: "Minimum size in bytes.", Example: 104857600},
 			configsParam,
 		}},
-	{Kind: "file.extension_matched", Title: "File extension matched", Category: "File events", Context: CtxFile,
+	{Kind: "file.extension_matched", Title: "File extension matched", Category: "File events", Context: CtxFile, RequiredModules: modsSync,
 		Description: "A file with one of the listed extensions was created or modified.",
 		Params: []ParamSpec{
 			{Name: "extensions", Type: PTStringList, Required: true, Description: "Extensions without the dot, case-insensitive.", Example: []string{"mp4", "mkv"}},
@@ -115,48 +103,48 @@ var fileCtx = []string{CtxFile}
 var allCtx = []string{CtxFile, CtxSync, CtxSchedule}
 
 var conditions = []KindSpec{
-	{Kind: "name.contains", Title: "Filename contains", Category: "Name", Contexts: fileCtx,
+	{Kind: "name.contains", Title: "Filename contains", Category: "Name", Contexts: fileCtx, RequiredModules: modsAutomation,
 		Description: "The file name contains the given text.",
 		Params: []ParamSpec{
 			{Name: "text", Type: PTString, Required: true, Description: "Text to look for.", Example: "highlight"},
 			{Name: "case_sensitive", Type: PTBoolean, Default: false, Description: "Match case exactly."},
 			negateParam,
 		}},
-	{Kind: "name.matches", Title: "Filename matches pattern", Category: "Name", Contexts: fileCtx,
+	{Kind: "name.matches", Title: "Filename matches pattern", Category: "Name", Contexts: fileCtx, RequiredModules: modsAutomation,
 		Description: "The file name matches a glob pattern such as \"*.tmp\" or \"Replay_*\".",
 		Params: []ParamSpec{
 			{Name: "pattern", Type: PTGlob, Required: true, Description: "Glob pattern.", Example: "*.part"},
 			{Name: "case_sensitive", Type: PTBoolean, Default: false, Description: "Match case exactly."},
 			negateParam,
 		}},
-	{Kind: "extension.in", Title: "File extension matches", Category: "Name", Contexts: fileCtx,
+	{Kind: "extension.in", Title: "File extension matches", Category: "Name", Contexts: fileCtx, RequiredModules: modsAutomation,
 		Description: "The file extension is one of the listed values.",
 		Params: []ParamSpec{
 			{Name: "extensions", Type: PTStringList, Required: true, Description: "Extensions without the dot, case-insensitive.", Example: []string{"mp4", "mov"}},
 			negateParam,
 		}},
-	{Kind: "size.compare", Title: "File size", Category: "Size", Contexts: fileCtx,
+	{Kind: "size.compare", Title: "File size", Category: "Size", Contexts: fileCtx, RequiredModules: modsAutomation,
 		Description: "Compares the file size with a value.",
 		Params: []ParamSpec{
 			{Name: "operator", Type: PTEnum, Required: true, Options: compareOps, Description: "gt, gte, lt, lte or eq.", Example: "gt"},
 			{Name: "bytes", Type: PTBytes, Required: true, Description: "Size in bytes.", Example: 1048576},
 			negateParam,
 		}},
-	{Kind: "path.matches", Title: "Folder path matches", Category: "Path", Contexts: fileCtx,
+	{Kind: "path.matches", Title: "Folder path matches", Category: "Path", Contexts: fileCtx, RequiredModules: modsAutomation,
 		Description: "The file's path relative to the sync root matches a glob. Use ** to match any number of folders.",
 		Params: []ParamSpec{
 			{Name: "pattern", Type: PTGlob, Required: true, Description: "Glob pattern over the relative path.", Example: "**/Temp/**"},
 			{Name: "case_sensitive", Type: PTBoolean, Default: false, Description: "Match case exactly."},
 			negateParam,
 		}},
-	{Kind: "file.age", Title: "File age", Category: "Time", Contexts: fileCtx,
+	{Kind: "file.age", Title: "File age", Category: "Time", Contexts: fileCtx, RequiredModules: modsAutomation,
 		Description: "Compares the number of days since the file was last modified.",
 		Params: []ParamSpec{
 			{Name: "operator", Type: PTEnum, Required: true, Options: compareOps, Description: "gt, gte, lt, lte or eq.", Example: "lt"},
 			{Name: "days", Type: PTInteger, Required: true, Min: f(0), Max: f(36500), Description: "Age in whole days.", Example: 30},
 			negateParam,
 		}},
-	{Kind: "date.compare", Title: "Date created or modified", Category: "Time", Contexts: fileCtx,
+	{Kind: "date.compare", Title: "Date created or modified", Category: "Time", Contexts: fileCtx, RequiredModules: modsAutomation,
 		Description: "Compares the file's created or modified time with a fixed date.",
 		Params: []ParamSpec{
 			{Name: "field", Type: PTEnum, Required: true, Options: []string{"created", "modified"}, Description: "Which timestamp to compare.", Example: "created"},
@@ -164,7 +152,7 @@ var conditions = []KindSpec{
 			{Name: "date", Type: PTDate, Required: true, Description: "YYYY-MM-DD (local midnight) or an RFC 3339 timestamp.", Example: "2026-01-01"},
 			negateParam,
 		}},
-	{Kind: "variable.compare", Title: "Metadata matches", Category: "Advanced", Contexts: allCtx,
+	{Kind: "variable.compare", Title: "Metadata matches", Category: "Advanced", Contexts: allCtx, RequiredModules: modsAutomation,
 		Description: "Compares any automation variable (see the variable reference) with a value.",
 		Params: []ParamSpec{
 			{Name: "variable", Type: PTVariable, Required: true, Description: "Variable name, e.g. file.parent_name or sync.files_failed.", Example: "file.parent_name"},
@@ -173,7 +161,7 @@ var conditions = []KindSpec{
 			{Name: "case_sensitive", Type: PTBoolean, Default: false, Description: "Match case exactly for text comparisons."},
 			negateParam,
 		}},
-	{Kind: "group", Title: "AND / OR group", Category: "Logic", Contexts: allCtx,
+	{Kind: "group", Title: "AND / OR group", Category: "Logic", Contexts: allCtx, RequiredModules: modsAutomation,
 		Description: "Combines several rules. mode \"all\" is AND, \"any\" is OR. Rules can nest groups.",
 		Params: []ParamSpec{
 			{Name: "mode", Type: PTEnum, Required: true, Options: []string{"all", "any"}, Description: "all = every rule must pass (AND); any = at least one (OR).", Example: "any"},
@@ -184,40 +172,40 @@ var conditions = []KindSpec{
 }
 
 var actions = []KindSpec{
-	{Kind: "sync.file", Title: "Synchronise file", Category: "Sync", Contexts: fileCtx,
+	{Kind: "sync.file", Title: "Synchronise file", Category: "Sync", Contexts: fileCtx, RequiredModules: modsSync,
 		Description: "Upload the file. Files that pass the sync configuration filters are uploaded by default; use this to make intent explicit.",
 		Params:      []ParamSpec{}},
-	{Kind: "sync.skip", Title: "Skip file", Category: "Sync", Contexts: fileCtx,
+	{Kind: "sync.skip", Title: "Skip file", Category: "Sync", Contexts: fileCtx, RequiredModules: modsSync,
 		Description: "Do not upload the file. Skip always wins over Synchronise for the same automation.",
 		Params: []ParamSpec{
 			{Name: "reason", Type: PTString, Description: "Shown in transfer history.", Example: "Temporary file"},
 		}},
-	{Kind: "dest.set_folder", Title: "Move to destination folder", Category: "Destination", Contexts: fileCtx,
+	{Kind: "dest.set_folder", Title: "Move to destination folder", Category: "Destination", Contexts: fileCtx, RequiredModules: modsSync,
 		Description: "Upload into this folder instead of mirroring the local folder. Relative paths are inside the sync configuration's destination; paths starting with / are from the root of your storage. Supports {{variables}}.",
 		Params: []ParamSpec{
 			{Name: "folder", Type: PTTemplate, Required: true, Description: "Destination folder template.", Example: "{{file.parent_name|default:\"Unsorted\"}}/{{file.created|date:\"YYYY-MM\"}}"},
 		}},
-	{Kind: "dest.rename", Title: "Rename destination file", Category: "Destination", Contexts: fileCtx,
+	{Kind: "dest.rename", Title: "Rename destination file", Category: "Destination", Contexts: fileCtx, RequiredModules: modsSync,
 		Description: "Store the file under a different name. The local file is never renamed.",
 		Params: []ParamSpec{
 			{Name: "name", Type: PTTemplate, Required: true, Description: "File name template.", Example: "{{file.created|date:\"YYYY-MM-DD_HH-mm\"}}_{{file.stem}}.{{file.ext}}"},
 		}},
-	{Kind: "dest.create_folder", Title: "Create destination folder", Category: "Destination", Contexts: allCtx,
+	{Kind: "dest.create_folder", Title: "Create destination folder", Category: "Destination", Contexts: allCtx, RequiredModules: modsAutomation,
 		Description: "Ensure a folder exists in your storage (created if missing).",
 		Params: []ParamSpec{
 			{Name: "folder", Type: PTTemplate, Required: true, Description: "Folder path template; relative paths are inside the sync destination.", Example: "/Archive/{{now|date:\"YYYY\"}}"},
 		}},
-	{Kind: "tag.apply", Title: "Apply tag", Category: "Organise", Contexts: fileCtx,
+	{Kind: "tag.apply", Title: "Apply tag", Category: "Organise", Contexts: fileCtx, RequiredModules: modsSync,
 		Description: "Attach storage tags/categories to the uploaded file.",
 		Params: []ParamSpec{
 			{Name: "tags", Type: PTStringList, Required: true, Templated: true, Description: "Tags (templates allowed).", Example: []string{"clips", "{{file.parent_name|lower}}"}},
 		}},
-	{Kind: "sync.start_task", Title: "Start another sync task", Category: "Sync", Contexts: allCtx,
+	{Kind: "sync.start_task", Title: "Start another sync task", Category: "Sync", Contexts: allCtx, RequiredModules: modsSync,
 		Description: "Queue a scan of another sync configuration on the same device. Guarded against loops.",
 		Params: []ParamSpec{
 			{Name: "config", Type: PTString, Required: true, Description: "Name of the sync configuration to run.", Example: "Screenshots"},
 		}},
-	{Kind: "notify.send", Title: "Send notification", Category: "Notify", Contexts: allCtx,
+	{Kind: "notify.send", Title: "Send notification", Category: "Notify", Contexts: allCtx, RequiredModules: modsAutomation,
 		Description: "Show a notification in the web interface and/or the desktop app.",
 		Params: []ParamSpec{
 			{Name: "title", Type: PTTemplate, Required: true, Description: "Notification title.", Example: "New clip: {{file.name}}"},
@@ -230,44 +218,30 @@ var actions = []KindSpec{
 // FileActionKinds are actions that change how a file is uploaded.
 var FileActionKinds = map[string]bool{"sync.file": true, "sync.skip": true, "dest.set_folder": true, "dest.rename": true, "tag.apply": true}
 
-var catalog = func() map[string]map[string]*KindSpec {
-	m := map[string]map[string]*KindSpec{TypeTrigger: {}, TypeCondition: {}, TypeAction: {}}
-	for i := range triggers {
-		triggers[i].Type = TypeTrigger
-		triggers[i].Ports = []string{PortNext}
-		m[TypeTrigger][triggers[i].Kind] = &triggers[i]
+// BuiltinKinds returns the built-in v1 kinds with their node type set.
+// They are registered in DefaultRegistry.
+func BuiltinKinds() []KindSpec {
+	var out []KindSpec
+	for _, g := range []struct {
+		t     string
+		kinds []KindSpec
+	}{{TypeTrigger, triggers}, {TypeCondition, conditions}, {TypeAction, actions}} {
+		for _, k := range g.kinds {
+			k.Type = g.t
+			out = append(out, k)
+		}
 	}
-	for i := range conditions {
-		conditions[i].Type = TypeCondition
-		conditions[i].Ports = []string{PortTrue, PortFalse}
-		m[TypeCondition][conditions[i].Kind] = &conditions[i]
-	}
-	for i := range actions {
-		actions[i].Type = TypeAction
-		actions[i].Ports = []string{PortNext}
-		m[TypeAction][actions[i].Kind] = &actions[i]
-	}
-	return m
-}()
+	return out
+}
 
 // LookupKind returns the spec for a node type and kind.
 func LookupKind(nodeType, kind string) *KindSpec {
-	if t, ok := catalog[nodeType]; ok {
-		return t[kind]
-	}
-	return nil
+	return DefaultRegistry.Lookup(nodeType, kind)
 }
 
 // Catalog returns every kind spec grouped by node type.
 func Catalog() map[string][]KindSpec {
-	out := map[string][]KindSpec{}
-	for t, kinds := range catalog {
-		for _, k := range kinds {
-			out[t] = append(out[t], *k)
-		}
-		sort.Slice(out[t], func(i, j int) bool { return out[t][i].Kind < out[t][j].Kind })
-	}
-	return out
+	return DefaultRegistry.Catalog()
 }
 
 // VariableSpec documents a template/condition variable.

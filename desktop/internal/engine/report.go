@@ -2,9 +2,12 @@ package engine
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/outbox"
 	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/client"
 )
 
@@ -26,7 +29,7 @@ func (e *Engine) timerLoop() {
 			n++
 			e.updateSpeeds(now)
 			if n%2 == 0 {
-				e.ctrl.Tick(now)
+				e.xfer.Tick(now)
 			}
 			if n%5 == 0 {
 				e.refreshStatus()
@@ -139,41 +142,140 @@ func (e *Engine) reportState() {
 	}
 }
 
-func (e *Engine) flushReports() {
+// Report kinds stored in the outbox. Each payload is a JSON array that fits
+// one server request.
+const (
+	reportKindTransfers     = "transfer_report"
+	reportKindNotifications = "notification"
+
+	maxTransfersPerReport     = 200 // api: at most 200 per /device/transfers
+	maxNotificationsPerReport = 50
+)
+
+// SetOutbox replaces the durable report outbox. Its Sender should be
+// e.DeliverReport. Without a call the engine creates one in Start (or on
+// first use), backed by the state store's database.
+func (e *Engine) SetOutbox(o *outbox.Outbox) {
+	e.mu.Lock()
+	e.outbox = o
+	e.mu.Unlock()
+}
+
+// reportOutbox returns the engine's outbox, creating it on first use, or nil
+// when there is no store.
+func (e *Engine) reportOutbox() *outbox.Outbox {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.outbox == nil && e.st != nil && e.st.DB != nil {
+		e.outbox = outbox.New(e.st.DB, e.DeliverReport, outbox.Options{Log: e.log, OnDrop: e.outboxDropped})
+	}
+	return e.outbox
+}
+
+// outboxDropped records an issue when reports are discarded undelivered.
+func (e *Engine) outboxDropped(reason, kind string, n int) {
+	e.recordIssue("outbox", "", kind, "report_dropped", fmt.Sprintf("%d undelivered report(s) dropped (%s)", n, reason))
+}
+
+// DeliverReport is the outbox Sender: it sends one stored report batch.
+// Requests the server will never accept are marked permanent so they are
+// dropped instead of retried.
+func (e *Engine) DeliverReport(ctx context.Context, kind string, payload []byte) error {
 	c := e.getClient()
 	if c == nil {
-		return
+		return errors.New("not connected")
 	}
+	var err error
+	switch kind {
+	case reportKindTransfers:
+		var items []client.TransferReport
+		if err := json.Unmarshal(payload, &items); err != nil {
+			return outbox.Permanent(err)
+		}
+		err = c.ReportTransfers(ctx, items)
+	case reportKindNotifications:
+		var items []client.NotificationReport
+		if err := json.Unmarshal(payload, &items); err != nil {
+			return outbox.Permanent(err)
+		}
+		err = c.Notify(ctx, items)
+	default:
+		return outbox.Permanent(fmt.Errorf("unknown report kind %q", kind))
+	}
+	if err != nil {
+		e.checkRevoked(err)
+		var ae *client.APIError
+		if errors.As(err, &ae) && ae.Status >= 400 && ae.Status < 500 {
+			switch ae.Status {
+			case 401, 403, 408, 429:
+			default:
+				return outbox.Permanent(err)
+			}
+		}
+	}
+	return err
+}
+
+// flushReports moves buffered transfer reports and notifications into the
+// durable outbox (also while offline) and then delivers what is ready.
+func (e *Engine) flushReports() {
+	ob := e.reportOutbox()
 	e.mu.Lock()
 	reports := e.reports
 	notes := e.notes
 	e.reports, e.notes = nil, nil
 	e.mu.Unlock()
-	ctx, cancel := context.WithTimeout(e.ctx, 20*time.Second)
-	defer cancel()
+	if ob == nil {
+		e.requeueReports(reports, notes)
+		return
+	}
 	for len(reports) > 0 {
-		n := min(len(reports), 200)
-		if err := c.ReportTransfers(ctx, reports[:n]); err != nil {
-			e.mu.Lock()
-			if len(e.reports) < 1000 {
-				e.reports = append(reports, e.reports...)
-			}
-			e.mu.Unlock()
+		n := min(len(reports), maxTransfersPerReport)
+		if err := enqueueJSON(ob, reportKindTransfers, reports[:n]); err != nil {
+			e.log.Warn("could not queue transfer report", "err", err)
 			break
 		}
 		reports = reports[n:]
 	}
 	for len(notes) > 0 {
-		n := min(len(notes), 50)
-		if err := c.Notify(ctx, notes[:n]); err != nil {
-			e.mu.Lock()
-			if len(e.notes) < 200 {
-				e.notes = append(notes, e.notes...)
-			}
-			e.mu.Unlock()
+		n := min(len(notes), maxNotificationsPerReport)
+		if err := enqueueJSON(ob, reportKindNotifications, notes[:n]); err != nil {
+			e.log.Warn("could not queue notification", "err", err)
 			break
 		}
 		notes = notes[n:]
+	}
+	e.requeueReports(reports, notes)
+	if e.getClient() == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(e.ctx, 20*time.Second)
+	defer cancel()
+	if _, err := ob.Flush(ctx); err != nil {
+		e.log.Debug("report delivery failed", "err", err)
+	}
+}
+
+func enqueueJSON(ob *outbox.Outbox, kind string, v any) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	return ob.Enqueue(kind, "", b)
+}
+
+// requeueReports puts reports that could not be stored back in memory.
+func (e *Engine) requeueReports(reports []client.TransferReport, notes []client.NotificationReport) {
+	if len(reports) == 0 && len(notes) == 0 {
+		return
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if len(reports) > 0 && len(e.reports) < 1000 {
+		e.reports = append(reports, e.reports...)
+	}
+	if len(notes) > 0 && len(e.notes) < 200 {
+		e.notes = append(notes, e.notes...)
 	}
 }
 

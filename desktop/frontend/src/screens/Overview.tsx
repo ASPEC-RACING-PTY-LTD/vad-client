@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ArrowUpFromLine, CheckCircle2, FolderPlus, Gauge, Layers, RefreshCw, Timer, XCircle } from 'lucide-react'
 import { ListConfigs, SyncNow } from '../../wailsjs/go/main/App'
-import type { engine, main } from '../../wailsjs/go/models'
+import type { agent, engine } from '../../wailsjs/go/models'
 import { Button, EmptyState, ProgressBar, Stat, useUI } from '../ui'
 import { formatBytes, formatDuration, formatSpeed, timeAgo } from '../lib'
 
@@ -30,7 +30,7 @@ export function ActiveList({ items }: { items: engine.ActiveView[] }) {
   )
 }
 
-export function Overview({ snap, boot, goto }: { snap: engine.Snapshot | null; boot: main.Bootstrap; goto: (t: any) => void }) {
+export function Overview({ snap, boot, goto }: { snap: engine.Snapshot | null; boot: agent.Bootstrap; goto: (t: any) => void }) {
   const [configs, setConfigs] = useState<engine.ConfigView[]>([])
   const { toast } = useUI()
   useEffect(() => {

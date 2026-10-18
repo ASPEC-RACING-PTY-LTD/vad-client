@@ -1,5 +1,8 @@
 name: CI
 
+# Client repository (VaultDock): the shared Go SDK (sdk/) and the Windows app
+# (desktop/). The server, web app, install.sh and server image live in
+# ASPEC-RACING-PTY-LTD/vad-server and have their own CI.
 on:
   push:
     branches: [main]
@@ -13,40 +16,41 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  WAILS_VERSION: v2.16.0
+
 # All jobs run in parallel; each restores its own dependency caches.
 jobs:
-  server:
-    name: Server tests
+  sdk:
+    name: SDK
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: sdk
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+          go-version-file: sdk/go.mod
+          cache-dependency-path: sdk/go.sum
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "These files need gofmt:" >&2
+            echo "$unformatted" >&2
+            exit 1
+          fi
+      - name: go mod tidy
+        run: go mod tidy -diff
       - run: go vet ./...
+      - name: go vet (windows)
+        run: GOOS=windows go vet ./...
       - run: go test ./...
 
-  web:
-    name: Web app
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: web
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-      - run: npm ci --no-audit --no-fund
-      - run: npm run build
-
   desktop:
-    name: Desktop tests
+    name: Desktop
     runs-on: windows-latest
     timeout-minutes: 20
     defaults:
@@ -58,7 +62,7 @@ jobs:
         with:
           go-version-file: desktop/go.mod
           cache-dependency-path: |
-            go.sum
+            sdk/go.sum
             desktop/go.sum
       - uses: actions/setup-node@v5
         with:
@@ -72,28 +76,149 @@ jobs:
           npm run build
       - run: go vet ./...
       - run: go test ./...
+      # The internal packages have !windows stubs; keep them compiling. The
+      # main package (Wails + systray) is Windows-only and is not checked here.
+      - name: go vet (linux stubs)
+        shell: bash
+        run: GOOS=linux go vet ./internal/...
 
-  installer:
-    name: Installer script
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
+  bindings-diff:
+    name: Wails bindings up to date
+    runs-on: windows-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
-      - run: bash -n install.sh
-      - run: shellcheck --severity=error install.sh
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: desktop/go.mod
+          cache-dependency-path: |
+            sdk/go.sum
+            desktop/go.sum
+      - name: Cache Wails CLI
+        id: wails-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin/wails.exe
+          key: wails-${{ runner.os }}-${{ env.WAILS_VERSION }}
+      - name: Install Wails CLI
+        if: steps.wails-cache.outputs.cache-hit != 'true'
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
+      # main.go embeds frontend/dist; the bindings generator only needs it to
+      # exist, so a placeholder avoids a full frontend build.
+      - name: Placeholder frontend/dist
+        shell: bash
+        run: mkdir -p desktop/frontend/dist && touch desktop/frontend/dist/.keep
+      - name: Generate bindings
+        working-directory: desktop
+        run: wails generate module
+      - name: Fail if wailsjs changed
+        shell: bash
+        run: |
+          changes=$(git status --porcelain -- desktop/frontend/wailsjs)
+          if [ -n "$changes" ]; then
+            echo "desktop/frontend/wailsjs is stale; run 'wails generate module' in desktop/ and commit:" >&2
+            echo "$changes" >&2
+            git diff --stat -- desktop/frontend/wailsjs >&2
+            exit 1
+          fi
 
-  image:
-    name: Server image
+  # End-to-end tests of the desktop engine against a real vad-server. The
+  # test module (desktop/e2e) resolves vad-server at ../../../vad-server, so
+  # both repositories are checked out side by side under the workspace.
+  # Allowed to fail until ASPEC-RACING-PTY-LTD/vad-server is published on
+  # GitHub (the checkout fails until then); remove continue-on-error after.
+  e2e:
+    name: E2E (desktop engine vs vad-server)
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v5
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/build-push-action@v6
         with:
-          context: .
-          platforms: linux/amd64
-          push: false
-          build-args: VERSION=ci-${{ github.sha }}
-          cache-from: type=gha,scope=server-image
-          cache-to: type=gha,scope=server-image,mode=max
+          path: VaultDock
+      - uses: actions/checkout@v5
+        with:
+          repository: ASPEC-RACING-PTY-LTD/vad-server
+          path: vad-server
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: VaultDock/desktop/e2e/go.mod
+          cache-dependency-path: |
+            VaultDock/desktop/e2e/go.sum
+            vad-server/go.sum
+      - name: go test
+        working-directory: VaultDock/desktop/e2e
+        run: go test ./...
+
+  licences:
+    name: Licences
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: desktop/go.mod
+          cache-dependency-path: |
+            sdk/go.sum
+            desktop/go.sum
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: desktop/frontend/package-lock.json
+      - name: Download dependencies
+        run: |
+          (cd sdk && go mod download)
+          (cd desktop && go mod download)
+          (cd desktop/frontend && npm ci --no-audit --no-fund)
+      # Gate on the allowlist, then fail if THIRD_PARTY_NOTICES.md is stale.
+      - name: Licence check
+        run: bash .licenses/check.sh && bash .licenses/check.sh --notices
+
+  # Builds the NSIS installer to prove it still packages; nothing is published.
+  nsis:
+    name: NSIS installer
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: desktop/go.mod
+          cache-dependency-path: |
+            sdk/go.sum
+            desktop/go.sum
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: desktop/frontend/package-lock.json
+      - name: Cache Wails CLI
+        id: wails-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin/wails.exe
+          key: wails-${{ runner.os }}-${{ env.WAILS_VERSION }}
+      - name: Install Wails CLI
+        if: steps.wails-cache.outputs.cache-hit != 'true'
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
+      - name: Ensure NSIS
+        shell: pwsh
+        run: |
+          if (-not (Get-Command makensis -ErrorAction SilentlyContinue)) {
+            $nsis = 'C:\Program Files (x86)\NSIS'
+            if (-not (Test-Path "$nsis\makensis.exe")) { choco install nsis -y --no-progress }
+            Add-Content $env:GITHUB_PATH $nsis
+          }
+      - name: Frontend
+        working-directory: desktop/frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+      - name: Build installer
+        working-directory: desktop
+        run: wails build -s -skipbindings -clean -nsis -trimpath -ldflags "-s -w -X main.version=0.0.0-ci"
+      - name: Check installer exists
+        shell: bash
+        run: ls desktop/build/bin/*-amd64-setup.exe

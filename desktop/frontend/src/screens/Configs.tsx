@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Eye, Film, FileStack, Folder, FolderOpen, FolderPlus, Image, MoreHorizontal, Pencil, Plus, RefreshCw, Trash2, X } from 'lucide-react'
 import { DeleteConfig, ListAutomations, ListConfigs, OpenFolder, PickFiles, PickFolder, PreviewConfig, SaveConfig, SuggestFolders, SyncNow } from '../../wailsjs/go/main/App'
-import type { config, engine, main } from '../../wailsjs/go/models'
+import type { agent, config, engine } from '../../wailsjs/go/models'
 import { Badge, Button, cx, EmptyState, Field, IconButton, Menu, Modal, PageLoader, Toggle, useUI } from '../ui'
 import { errMsg, formatBytes, timeAgo } from '../lib'
 
@@ -78,7 +78,7 @@ function ListInput({ value, onChange, placeholder, mono }: { value: string[]; on
 const MB = 1024 * 1024
 
 function PreviewModal({ cfg, onClose }: { cfg: Cfg | null; onClose: () => void }) {
-  const [res, setRes] = useState<main.PreviewResult | null>(null)
+  const [res, setRes] = useState<agent.PreviewResult | null>(null)
   const [err, setErr] = useState('')
   const [filter, setFilter] = useState<'all' | 'upload' | 'skip' | 'filtered' | 'synced'>('all')
   useEffect(() => {

@@ -2,25 +2,14 @@ package engine
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"io"
-	"math/rand/v2"
-	"net"
 	"os"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/state"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/transfer"
 	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/client"
-)
-
-const (
-	maxChunkParallelPerFile = 4
-	maxAttempts             = 12
 )
 
 func (e *Engine) dispatchLoop() {
@@ -141,28 +130,6 @@ func (e *Engine) refreshStatus() {
 	}
 }
 
-func backoff(attempts int) time.Duration {
-	d := 5 * time.Second << min(attempts, 10)
-	d = min(d, 30*time.Minute)
-	jitter := time.Duration(rand.Int64N(int64(d / 5)))
-	return d + jitter
-}
-
-func isNetErr(err error) bool {
-	var ne net.Error
-	var oe *net.OpError
-	return errors.As(err, &ne) || errors.As(err, &oe) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, io.EOF)
-}
-
-func isCongestion(err error) bool {
-	var ae *client.APIError
-	if errors.As(err, &ae) {
-		return ae.Status == 429 || ae.Status == 503 || ae.Status == 502 || ae.Status == 504
-	}
-	var ne net.Error
-	return errors.As(err, &ne) && ne.Timeout()
-}
-
 // handleErr classifies a transfer error and reschedules or fails the item.
 func (e *Engine) handleErr(at *activeTransfer, err error, stage string) {
 	it := at.item
@@ -176,21 +143,21 @@ func (e *Engine) handleErr(at *activeTransfer, err error, stage string) {
 		_ = e.st.Defer(it.ID, time.Now().UnixMilli(), "")
 		e.revoked(ae.Message)
 		return
-	case isNetErr(err) && !errors.As(err, &ae):
+	case transfer.IsNetErr(err) && !errors.As(err, &ae):
 		e.mu.Lock()
 		e.netFailures++
 		if e.netFailures >= 3 {
 			e.offlineUntil = time.Now().Add(min(time.Duration(e.netFailures)*10*time.Second, 5*time.Minute))
 		}
 		e.mu.Unlock()
-		_ = e.st.Retry(it.ID, time.Now().Add(backoff(min(it.Attempts, 4))).UnixMilli(), msg)
+		_ = e.st.Retry(it.ID, time.Now().Add(transfer.Backoff(min(it.Attempts, 4))).UnixMilli(), msg)
 		e.log.Warn("network error", "file", it.RelPath, "err", err)
 		return
 	case errors.As(err, &ae) && ae.Status == 507:
 		_ = e.st.Retry(it.ID, time.Now().Add(15*time.Minute).UnixMilli(), "server is low on disk space; retrying later")
 		return
-	case client.Retryable(err) && it.Attempts+1 < maxAttempts:
-		wait := backoff(it.Attempts)
+	case client.Retryable(err) && it.Attempts+1 < transfer.MaxAttempts:
+		wait := transfer.Backoff(it.Attempts)
 		if errors.As(err, &ae) && ae.RetryAfter > wait {
 			wait = ae.RetryAfter
 		}
@@ -276,23 +243,17 @@ func (e *Engine) process(at *activeTransfer) {
 		_ = e.st.Defer(it.ID, time.Now().Add(stable-age+500*time.Millisecond).UnixMilli(), "waiting for the file to stop changing")
 		return
 	}
-	f, err := os.Open(abs)
+	f, err := openForUpload(abs)
 	if err != nil {
-		_ = e.st.Defer(it.ID, time.Now().Add(30*time.Second).UnixMilli(), "file is in use; waiting")
+		e.deferUnreadable(at, size, mtime, err)
 		return
 	}
 	defer f.Close()
+	e.clearOpenDeferral(it.ConfigID, it.RelPath)
 
 	// hash (bounded to avoid disk contention on HDDs)
 	at.phase.Store("hashing")
-	select {
-	case e.hashSem <- struct{}{}:
-	case <-ctx.Done():
-		_ = e.st.Defer(it.ID, time.Now().UnixMilli(), "")
-		return
-	}
-	sum, err := hashReader(ctx, f, size)
-	<-e.hashSem
+	sum, err := e.xfer.Hash(ctx, f, size)
 	if err != nil {
 		e.handleErr(at, err, "hash")
 		return
@@ -302,37 +263,26 @@ func (e *Engine) process(at *activeTransfer) {
 		return
 	}
 
-	at.phase.Store("uploading")
-	res, err := c.CreateUpload(ctx, client.UploadRequest{Path: it.RemotePath(), Size: size, SHA256: sum, ModifiedAt: fi.ModTime().UnixMilli(), Tags: it.Tags, OnConflict: cfg.OnConflict})
+	res, err := e.xfer.Upload(ctx, c, client.UploadRequest{Path: it.RemotePath(), Size: size, SHA256: sum, ModifiedAt: fi.ModTime().UnixMilli(), Tags: it.Tags, OnConflict: cfg.OnConflict}, f, transfer.Progress{Sent: &at.sent, Phase: func(p string) { at.phase.Store(p) }})
 	if err != nil {
-		e.handleErr(at, err, "start upload")
-		return
-	}
-	if res.Status != "complete" {
-		up := res.Upload
-		at.sent.Store(up.BytesReceived)
-		if err := e.uploadChunks(ctx, c, at, f, up); err != nil {
+		var se *transfer.StageError
+		if !errors.As(err, &se) {
 			e.handleErr(at, err, "upload")
 			return
 		}
-		at.phase.Store("finalizing")
-		res, err = c.CompleteUpload(ctx, up.ID)
-		if err != nil {
+		if se.Stage == "complete" {
 			switch {
-			case client.IsCode(err, "hash_mismatch") || client.IsCode(err, "size_mismatch"):
+			case client.IsCode(se.Err, "hash_mismatch") || client.IsCode(se.Err, "size_mismatch"):
 				// The file changed during the upload; start again once stable.
 				_ = e.st.Defer(it.ID, time.Now().Add(stable).UnixMilli(), "file changed during upload; will upload the new version")
 				return
-			case client.IsCode(err, "not_found") || client.IsCode(err, "upload_gone"):
+			case client.IsCode(se.Err, "not_found") || client.IsCode(se.Err, "upload_gone"):
 				_ = e.st.Defer(it.ID, time.Now().UnixMilli(), "upload session expired; restarting")
 				return
-			case client.IsCode(err, "incomplete"):
-				e.handleErr(at, err, "complete")
-				return
 			}
-			e.handleErr(at, err, "complete")
-			return
 		}
+		e.handleErr(at, se.Err, se.Stage)
+		return
 	}
 	// success
 	e.mu.Lock()
@@ -351,117 +301,73 @@ func (e *Engine) process(at *activeTransfer) {
 	e.log.Info("uploaded", "file", it.RelPath, "remote", it.RemotePath(), "result", res.Result, "bytes", size, "ms", time.Since(at.started).Milliseconds())
 }
 
-func hashReader(ctx context.Context, f *os.File, size int64) (string, error) {
-	h := sha256.New()
-	buf := make([]byte, 1<<20)
-	r := io.NewSectionReader(f, 0, size)
-	for {
-		if err := ctx.Err(); err != nil {
-			return "", err
-		}
-		n, err := r.Read(buf)
-		h.Write(buf[:n])
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return "", err
-		}
+// Bounds on waiting for a file that cannot be opened, typically because
+// another process holds it locked (B12). Variables so tests can shorten them.
+var (
+	openRetryDelay   = 30 * time.Second
+	maxOpenDeferrals = 20
+	maxOpenDeferSpan = 30 * time.Minute
+	openForUpload    = os.Open
+)
+
+const (
+	// issueSourceTransfer marks issues raised while uploading queued files.
+	issueSourceTransfer = "transfer"
+	// openDeferPrefix prefixes the kv keys holding open-failure counts.
+	openDeferPrefix = "open_defer/"
+)
+
+func openDeferKey(configID, rel string) string { return openDeferPrefix + configID + "/" + rel }
+
+// deferUnreadable reschedules a file that could not be opened. The count and
+// first failure time are kept in kv per file version (size, mtime), so the
+// bound survives restarts and resets when the file changes. Once
+// maxOpenDeferrals or maxOpenDeferSpan is reached the file is marked skipped,
+// which scans and the watcher leave alone until its size or mtime changes,
+// and an issue is recorded.
+func (e *Engine) deferUnreadable(at *activeTransfer, size, mtime int64, err error) {
+	it := at.item
+	key := openDeferKey(it.ConfigID, it.RelPath)
+	now := time.Now()
+	count, first := 0, now.UnixMilli()
+	var s, m, f int64
+	var c int
+	if _, perr := fmt.Sscanf(e.st.Get(key), "%d %d %d %d", &s, &m, &c, &f); perr == nil && s == size && m == mtime {
+		count, first = c, f
 	}
-	return hex.EncodeToString(h.Sum(nil)), nil
+	count++
+	class := classifyIssue(err)
+	if count < maxOpenDeferrals && now.Sub(time.UnixMilli(first)) < maxOpenDeferSpan {
+		e.st.Set(key, fmt.Sprintf("%d %d %d %d", size, mtime, count, first))
+		note := "file is in use; waiting"
+		if class != issueLocked {
+			note = "cannot open the file; waiting"
+		}
+		_ = e.st.Defer(it.ID, now.Add(openRetryDelay).UnixMilli(), note)
+		return
+	}
+	e.clearOpenDeferral(it.ConfigID, it.RelPath)
+	reason := "file is in use by another program; skipped until it changes"
+	if class != issueLocked {
+		reason = "file cannot be opened; skipped until it changes"
+	}
+	e.recordIssue(issueSourceTransfer, it.ConfigID, it.RelPath, class, fmt.Sprintf("%s (%d attempts): %v", reason, count, err))
+	_ = e.st.Done(it.ID)
+	_ = e.st.PutFile(state.FileEntry{ConfigID: it.ConfigID, RelPath: it.RelPath, Size: size, MTime: mtime, Status: "skipped", Reason: reason})
+	e.mu.Lock()
+	e.run(it.ConfigID)
+	e.reports = append(e.reports, client.TransferReport{Path: it.RemotePath(), Size: size, Status: "skipped", Error: reason})
+	e.mu.Unlock()
+	e.log.Warn("file skipped: cannot open", "file", it.RelPath, "class", class, "attempts", count, "err", err)
 }
 
-// uploadChunks sends missing chunks with bounded per-file parallelism and
-// global adaptive concurrency.
-func (e *Engine) uploadChunks(ctx context.Context, c *client.Client, at *activeTransfer, f *os.File, up *client.UploadSession) error {
-	missing := up.Missing()
-	if len(missing) == 0 {
-		return nil
+// clearOpenDeferral forgets the open-failure count of a file.
+func (e *Engine) clearOpenDeferral(configID, rel string) {
+	key := openDeferKey(configID, rel)
+	if e.st.Get(key) == "" {
+		return
 	}
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	jobs := make(chan int64, len(missing))
-	for _, idx := range missing {
-		jobs <- idx
-	}
-	close(jobs)
-	var (
-		wg       sync.WaitGroup
-		errOnce  sync.Once
-		firstErr error
-	)
-	for w := 0; w < min(maxChunkParallelPerFile, len(missing)); w++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for idx := range jobs {
-				if ctx.Err() != nil {
-					return
-				}
-				if err := e.sendChunk(ctx, c, at, f, up, idx); err != nil {
-					errOnce.Do(func() { firstErr = err })
-					cancel()
-					return
-				}
-			}
-		}()
-	}
-	wg.Wait()
-	if firstErr != nil {
-		return firstErr
-	}
-	return ctx.Err()
-}
-
-// progressReaderAt reports bytes as they are read by the HTTP transport.
-type progressReaderAt struct {
-	r            io.ReaderAt
-	total, local *atomic.Int64
-}
-
-func (p progressReaderAt) ReadAt(b []byte, off int64) (int, error) {
-	n, err := p.r.ReadAt(b, off)
-	p.total.Add(int64(n))
-	p.local.Add(int64(n))
-	return n, err
-}
-
-func (e *Engine) sendChunk(ctx context.Context, c *client.Client, at *activeTransfer, f *os.File, up *client.UploadSession, idx int64) error {
-	off, n := idx*up.ChunkSize, up.ChunkLen(idx)
-	sum, err := client.HashSection(f, off, n)
-	if err != nil {
-		return err
-	}
-	for attempt := 0; ; attempt++ {
-		if err := e.ctrl.Acquire(ctx); err != nil {
-			return err
-		}
-		var local atomic.Int64
-		start := time.Now()
-		err := c.PutChunkHashed(ctx, up.ID, idx, progressReaderAt{r: f, total: &at.sent, local: &local}, off, n, sum)
-		lat := time.Since(start)
-		var ok int64
-		if err == nil {
-			ok = n
-		}
-		e.ctrl.Release(ok, lat, err != nil && isCongestion(err))
-		if err == nil {
-			at.sent.Add(n - local.Load())
-			return nil
-		}
-		at.sent.Add(-local.Load())
-		if errors.Is(err, context.Canceled) || !client.Retryable(err) || attempt >= 4 {
-			return err
-		}
-		wait := time.Duration(1<<attempt) * 500 * time.Millisecond
-		var ae *client.APIError
-		if errors.As(err, &ae) && ae.RetryAfter > 0 {
-			wait = ae.RetryAfter
-		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(wait):
-		}
+	if _, err := e.st.DB.Exec("DELETE FROM kv WHERE k = ?", key); err != nil {
+		e.log.Warn("clear open deferral", "file", rel, "err", err)
 	}
 }

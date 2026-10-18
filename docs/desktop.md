@@ -50,14 +50,14 @@ Development builds (version `dev`) never update themselves.
 
 ## Publishing a release
 
-Push a version tag. The **Release** workflow builds the Windows installer and the multi-architecture server image in parallel, then publishes the GitHub release with `SHA256SUMS`:
+Push a version tag in this repository (`ASPEC-RACING-PTY-LTD/VaultDock`). The **Release** workflow builds the Windows installer, then publishes the GitHub release with the component manifest and `SHA256SUMS`. Signing is optional and driven by repository secrets: `WINDOWS_CERT_PFX` (base64 .pfx) and `WINDOWS_CERT_PASSWORD` for Authenticode, `RELEASE_MANIFEST_KEY` (Ed25519 PEM) for the component manifest signature.
 
 ```bash
 ch tag v1.2.0
 ch push origin v1.2.0
 ```
 
-Desktop apps, `install.sh upgrade` and the download page on vaultdock.dev all use the latest release, so nothing else needs updating. Make the `ghcr.io/aspec-racing-pty-ltd/vaultdock` package public once so servers can pull the image; if it is not reachable, the installer builds from source instead.
+Desktop apps and the download page on vaultdock.dev use the latest release, so nothing else needs updating. The server image (`ghcr.io/aspec-racing-pty-ltd/vad-server`) is released separately from the `ASPEC-RACING-PTY-LTD/vad-server` repository.
 
 ## Connecting to different servers
 

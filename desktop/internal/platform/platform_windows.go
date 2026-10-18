@@ -24,24 +24,52 @@ func blob(b []byte) *windows.DataBlob {
 	return &windows.DataBlob{Size: uint32(len(b)), Data: &b[0]}
 }
 
-func protect(data []byte) ([]byte, error) {
+// entropyBlob returns nil (no entropy) for empty input.
+func entropyBlob(b []byte) *windows.DataBlob {
+	if len(b) == 0 {
+		return nil
+	}
+	return blob(b)
+}
+
+func dpapiProtect(data, entropy []byte, flags uint32) ([]byte, error) {
 	var out windows.DataBlob
-	ent := blob(dpapiEntropy)
-	if err := windows.CryptProtectData(blob(data), windows.StringToUTF16Ptr("VaultDock"), ent, 0, nil, windows.CRYPTPROTECT_UI_FORBIDDEN, &out); err != nil {
+	if err := windows.CryptProtectData(blob(data), windows.StringToUTF16Ptr("VaultDock"), entropyBlob(entropy), 0, nil, windows.CRYPTPROTECT_UI_FORBIDDEN|flags, &out); err != nil {
 		return nil, fmt.Errorf("DPAPI protect: %w", err)
 	}
 	defer windows.LocalFree(windows.Handle(unsafe.Pointer(out.Data)))
 	return append([]byte(nil), unsafe.Slice(out.Data, out.Size)...), nil
 }
 
-func unprotect(data []byte) ([]byte, error) {
+func dpapiUnprotect(data, entropy []byte, flags uint32) ([]byte, error) {
 	var out windows.DataBlob
-	ent := blob(dpapiEntropy)
-	if err := windows.CryptUnprotectData(blob(data), nil, ent, 0, nil, windows.CRYPTPROTECT_UI_FORBIDDEN, &out); err != nil {
+	if err := windows.CryptUnprotectData(blob(data), nil, entropyBlob(entropy), 0, nil, windows.CRYPTPROTECT_UI_FORBIDDEN|flags, &out); err != nil {
 		return nil, fmt.Errorf("DPAPI unprotect: %w", err)
 	}
 	defer windows.LocalFree(windows.Handle(unsafe.Pointer(out.Data)))
 	return append([]byte(nil), unsafe.Slice(out.Data, out.Size)...), nil
+}
+
+func protect(data []byte) ([]byte, error)   { return dpapiProtect(data, dpapiEntropy, 0) }
+func unprotect(data []byte) ([]byte, error) { return dpapiUnprotect(data, dpapiEntropy, 0) }
+
+func protectMachine(data, entropy []byte) ([]byte, error) {
+	return dpapiProtect(data, entropy, windows.CRYPTPROTECT_LOCAL_MACHINE)
+}
+
+func unprotectMachine(data, entropy []byte) ([]byte, error) {
+	// The blob records its scope; the flag is accepted on unprotect too.
+	return dpapiUnprotect(data, entropy, windows.CRYPTPROTECT_LOCAL_MACHINE)
+}
+
+func programDataDir() string {
+	if d, err := windows.KnownFolderPath(windows.FOLDERID_ProgramData, 0); err == nil && d != "" {
+		return d
+	}
+	if d := os.Getenv("ProgramData"); d != "" {
+		return d
+	}
+	return `C:\ProgramData`
 }
 
 func setAutoStart(enabled bool) error {

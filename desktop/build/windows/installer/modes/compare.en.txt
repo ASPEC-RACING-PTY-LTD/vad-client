@@ -1,0 +1,31 @@
+SIMPLE OR ADVANCED?
+
+                    Simple Folder Backups     Full Access (Advanced)
+                    ---------------------     ----------------------
+Folder backups      Yes                       Yes
+Browse and restore  Yes                       Yes
+Sync (1- and 2-way) No                        Yes
+Automations         No                        Yes
+App discovery and   No                        Yes, you confirm each
+  reinstall                                   app
+App settings and    No                        Yes, per-app keys only
+  registry backup
+Locked files        Skipped and retried;      Backed up from snapshots
+                    snapshot add-on optional
+Whose files         Only yours                Yours, plus other users
+                                              who agree
+Windows service     Yes                       Yes, plus the Windows
+                                              backup privilege
+Admin to install    Yes                       Yes
+Extra downloads     None                      Components from GitHub,
+                                              roughly tens of MB
+CPU, memory, disk   Low                       Higher during scans
+                                              and snapshots
+
+Both modes:
+- Read files with each user's own Windows permissions.
+- Never change Windows system files.
+- Encrypt files on this PC before upload.
+- By default the server also holds the keys, so your server admin can
+  browse and restore your files.
+- Can be switched later in Settings > Mode, without reinstalling.

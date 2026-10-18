@@ -1,0 +1,25 @@
+SWITCHING MODES LATER
+
+You can switch between Simple and Advanced at any time in Settings > Mode.
+You do not need to reinstall. Your backups and settings are kept. Windows
+asks for administrator approval before the switch.
+
+Simple to Advanced
+- VaultDock downloads and checks the extra components from GitHub.
+- The Advanced tools and screens are turned on.
+- Your existing backups and jobs are not changed.
+
+Advanced to Simple
+- VaultDock first shows what will be paused and asks you to confirm.
+- Sync, automations, app and registry jobs, and other users' profiles
+  are paused, not deleted.
+- Two-way sync stops. No files are deleted on this PC or on the server.
+- All backups stay browsable, and files can still be restored.
+  Reinstalling apps needs Advanced mode again.
+- The extra components are kept for 30 days by default, so switching
+  back is quick. You can remove them sooner.
+
+Paused items can run again after you switch back to Advanced.
+
+An administrator can also request a mode change from the VaultDock web
+app. It only happens after a local administrator confirms it on this PC.

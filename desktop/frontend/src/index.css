@@ -28,8 +28,20 @@
   ::selection {
     @apply bg-brand-500/25;
   }
+  /* Visible keyboard focus ring for every focusable element (mouse clicks do not trigger :focus-visible). */
   :focus-visible {
     @apply outline-2 outline-offset-2 outline-brand-500;
+  }
+  .dark :focus-visible {
+    @apply outline-brand-400;
+  }
+  /* Controls styled with focus:outline-none (e.g. .input) still get the ring from their focus styles;
+     windows high-contrast mode drops box-shadow rings, so restore a real outline there. */
+  @media (forced-colors: active) {
+    :focus-visible {
+      outline: 2px solid CanvasText;
+      outline-offset: 2px;
+    }
   }
 }
 
@@ -91,4 +103,21 @@
 }
 .animate-indeterminate {
   animation: vd-indeterminate 1.3s ease-in-out infinite;
+}
+
+/* Respect the OS "reduce motion" setting: stop spinners, transitions and the indeterminate bar sliding. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .animate-indeterminate {
+    animation: none !important;
+    width: 100% !important;
+    opacity: 0.6;
+  }
 }

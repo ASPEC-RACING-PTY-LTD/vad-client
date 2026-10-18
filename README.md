@@ -1,88 +1,96 @@
 # VaultDock
 
-Self-hosted file storage and intelligent synchronisation. Run it on your own hardware, connect your Windows PCs, choose exactly which folders and files to sync, and let visual automations decide where everything goes.
+The Windows client of VaultDock, a self-hosted backup, file storage and synchronisation system. This repository holds the Windows desktop app and the shared Go SDK. The server and web app live in [ASPEC-RACING-PTY-LTD/vad-server](https://github.com/ASPEC-RACING-PTY-LTD/vad-server).
 
-- **Web app**: file browser with previews and streamed video playback, uploads, trash, search and tags, devices, sync overview, activity, and an admin console.
-- **Windows desktop app**: tray app that watches the folders you select and uploads changes in the background with resumable, verified, adaptively parallel transfers.
-- **Visual automation builder**: node-based workflows (triggers, AND/OR conditions, branches, actions) with JSON import/export, a variable reference, AI-friendly schema docs and dry runs.
-- **Secure by design**: HTTPS, device approval, Ed25519 per-device keys stored with Windows DPAPI, signed and replay-protected requests, strict per-user isolation.
+- **Windows desktop app**: tray app and Windows service that back up the folders you select, browse and restore older versions, and (in Advanced mode) sync folders, run automations, discover and reinstall apps, and back up app settings.
+- **Resumable, verified transfers**: background uploads with adaptively parallel chunk transfers.
+- **Secure by design**: device approval, Ed25519 per-device keys protected with Windows DPAPI, signed and replay-protected requests. Backups are encrypted on the PC before upload.
+- **SDK** (`sdk/`, Go module `github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk`): automation engine, API client, request signing, wire types and the backup format, shared with the server.
 
-> Example use: sync Medal gaming clips into `/Medal/<game>/<year-month>/`, skip temporary recordings, tag them by game, and watch them in the browser.
+## Install the server first
 
-## Install (Linux server with Docker)
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/ASPEC-RACING-PTY-LTD/VaultDock/main/install.sh | bash
-```
-
-The installer shows a menu: **1) Install / Replace, 2) Upgrade, 3) Uninstall, 4) Automatic updates**. It installs the latest release into `~/VaultDock` (or `/root/VaultDock` as root): only the server's runtime files go into `~/VaultDock/app`, together with a complete, pre-filled `.env` (generated setup token included). It asks where to store files (point it at your HDD) and how the server is reached (Cloudflare Tunnel or reverse proxy, built-in Caddy, self-signed, or plain HTTP), pulls the prebuilt image (or builds it from a temporary copy of the source), starts the container on port 3000, and waits until it is healthy.
-
-Then open the printed URL, create the administrator with the setup token, and install the desktop app.
-
-### Prefer to inspect first? (recommended)
-
-Piping a script from the internet into a shell runs it with your privileges before you have read it. To review it first:
+The server runs in Docker on Linux. Its installer is in the server repository:
 
 ```bash
-curl -fsSL -o install.sh https://raw.githubusercontent.com/ASPEC-RACING-PTY-LTD/VaultDock/main/install.sh
+curl -fsSL -o install.sh https://raw.githubusercontent.com/ASPEC-RACING-PTY-LTD/vad-server/main/install.sh
 less install.sh
 bash install.sh
 ```
 
-Or clone the repository and run `./install.sh` from it; the installer then uses the local source instead of downloading. Pin a release with `VAULTDOCK_REF=v1.0.0`.
-
-What the installer does and does not do:
-
-- Writes only inside the install directory, plus the storage path you choose.
-- Needs Docker Engine with the Compose plugin; it does not install system packages.
-- Never deletes stored files, the database or settings unless you choose full uninstall **and** type `DELETE ALL DATA`.
-- Upgrades back up the database, `.env` and application first, and roll back automatically if the new version does not become healthy.
-
-Non-interactive use: `VAULTDOCK_YES=1 bash install.sh install` (defaults are used; destructive actions still require a terminal).
+The image is `ghcr.io/aspec-racing-pty-ltd/vad-server`. See the [vad-server README](https://github.com/ASPEC-RACING-PTY-LTD/vad-server#readme) for details.
 
 ## Windows desktop app
 
-Build the installer (see [docs/desktop.md](docs/desktop.md)) or download `VaultDock-<version>-amd64-setup.exe` from a release. It installs per user (no admin rights), bundles everything it needs and installs the WebView2 runtime if missing.
+Build the installer (see [docs/desktop.md](docs/desktop.md)) or download `VaultDock-<version>-amd64-setup.exe` from a release. Installing needs administrator rights once. The installer offers two modes, each with an (i) info text:
+
+- **Simple Folder Backups**: back up folders of your own Windows profile on a schedule, then browse and restore them.
+- **Full Access (Advanced)**: adds sync, automations, app discovery and reinstall, settings backup, snapshots and (with their consent) other profiles on the PC.
+
+You can switch modes later in **Settings > Mode** without reinstalling.
 
 1. Enter your server URL, username and password.
 2. The app shows a verification code. In the web interface open **Devices**, check the code, and approve.
-3. Add sync folders (presets for Medal clips, screenshots and documents), preview what will upload, and you're done.
+3. Pick the folders to back up, preview what will upload, and you're done.
 
 The password is used once to request access and is never stored. Revoking a device in the web interface stops it immediately.
 
-## Updates
+**Who can read your backups:** by default the server also holds the backup keys (full escrow), so the server administrator can browse and restore your files, for example onto a new PC. An administrator can instead set a repository to metadata escrow, where the server sees file names but never file contents. A recovery key lets you restore even without the server.
 
-- **Desktop app**: updates itself from GitHub releases. Installers are verified against their published SHA-256 checksum and installed while nothing is syncing.
-- **Server**: the admin console shows new releases. Upgrade with `~/VaultDock/app/install.sh upgrade`, or turn on nightly updates with `~/VaultDock/app/install.sh auto-update on`. Every upgrade backs up first and rolls back automatically if the new version is unhealthy.
-- **Releases**: push a `vX.Y.Z` tag and the Release workflow publishes the Windows installer, `SHA256SUMS` and the multi-architecture server image.
+## Updates and releases
+
+- The desktop app updates itself from the GitHub releases of `ASPEC-RACING-PTY-LTD/VaultDock`. Installers are verified against their published SHA-256 checksum.
+- Push a `vX.Y.Z` tag and the Release workflow publishes the Windows installer, the component manifest `components-<version>.json` (with a detached Ed25519 signature when `RELEASE_MANIFEST_KEY` is set) and `SHA256SUMS`. The installer and app are Authenticode-signed when `WINDOWS_CERT_PFX` (and `WINDOWS_CERT_PASSWORD`) are set.
 
 ## Documentation
 
 | Topic | |
 |---|---|
-| [Deployment](docs/deployment.md) | Docker, storage disks, HTTPS options, reverse proxies, backups |
-| [Upgrade, uninstall & troubleshooting](docs/operations.md) | Day-two operations and common problems |
-| [Architecture](docs/architecture.md) | Components, data model, sync engine, adaptive concurrency |
-| [Security](docs/security.md) | Threat model, transport, device keys, isolation, end-to-end encryption trade-offs |
-| [Automations](docs/automations.md) | Schema, variables, templates and how to generate automations with an AI assistant |
 | [Desktop app](docs/desktop.md) | Building, installer, updates, logs |
+| [Architecture](docs/architecture.md) | Components, sync engine, adaptive concurrency, automations |
 | [Development](docs/development.md) | Running locally, tests |
+| [Server documentation](https://github.com/ASPEC-RACING-PTY-LTD/vad-server/tree/main/docs) | Deployment, operations, security, automations |
 
 ## Repository layout
 
 ```
-cmd/vaultdock        server entry point (serve, healthcheck, backup, reset-password)
-internal/            server: API, storage, database, auth
-pkg/automation       automation schema, validator and engine (shared with the desktop app)
-pkg/client           Go API client (desktop app and integration tests)
-pkg/protocol         device request signing
-web/                 React web interface (embedded into the server binary)
-desktop/             Wails Windows app: sync engine, UI and NSIS installer
-tests/integration    end-to-end tests against a running deployment
-install.sh           installer / upgrader / uninstaller
-Dockerfile, docker-compose.yml
+sdk/                 shared Go SDK (automation, client, protocol, wire, backup format, ...)
+sdk/contracts        API and backup-format contracts
+desktop/             Wails Windows app: UI, agent service, sync and backup engine, NSIS installer
+desktop/e2e          end-to-end tests of the desktop engine against a real server
+scripts/             build helpers (icons, code signing)
+assets/              brand assets
 ```
 
-## License
+## Licence
 
-Not chosen yet. Add a LICENSE file before publishing the repository.
+VaultDock is source-available under the [PolyForm Noncommercial License 1.0.0](LICENSE).
+
+- **Noncommercial use is permitted**: personal use, hobby projects, research, and use by
+  charities, educational institutions, public research, public safety or health
+  organisations and government institutions.
+- **Commercial use requires a separate licence.** Contact ASPEC Racing Pty Ltd via
+  <https://github.com/ASPEC-RACING-PTY-LTD> to arrange one.
+- Redistribution must keep the `LICENSE` file (or its URL) and the line
+  `Required Notice: Copyright 2026 ASPEC Racing Pty Ltd (https://github.com/ASPEC-RACING-PTY-LTD)`.
+
+Third-party components keep their own licences; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## Credits
+
+VaultDock is built on these open-source projects. Thank you to their authors and contributors.
+
+| Project | Licence | What it does in VaultDock |
+|---|---|---|
+| [Wails](https://github.com/wailsapp/wails) (incl. go-webview2) | MIT | Desktop application shell: WebView2 window, Go/JS bindings, native dialogs |
+| [energye/systray](https://github.com/energye/systray) | Apache-2.0 | System-tray icon and menu |
+| [go-toast](https://git.sr.ht/~jackmordaunt/go-toast) | MIT OR Unlicense | Windows toast notifications |
+| [rjeczalik/notify](https://github.com/rjeczalik/notify) | MIT | File-system change notifications for sync folders |
+| [modernc.org/sqlite](https://gitlab.com/cznic/sqlite) (with modernc.org/libc) | BSD-3-Clause (SQLite: public domain) | Local state database without cgo |
+| [Go `x/` libraries](https://go.dev/) (`x/sys`, `x/time`, `x/net`, `x/text`) | BSD-3-Clause | Windows system APIs and registry access; transfer bandwidth limiting |
+| [go-ole](https://github.com/go-ole/go-ole) | MIT | COM interop on Windows (via Wails) |
+| [React](https://react.dev/) | MIT | Desktop user interface |
+| [Lucide](https://lucide.dev/) | ISC | Icons |
+| [Tailwind CSS](https://tailwindcss.com/) | MIT | Styling of the desktop interface |
+
+The full list of incorporated components, including indirect ones, with their licence
+texts is in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

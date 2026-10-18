@@ -8,20 +8,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/url"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
-	_ "modernc.org/sqlite"
-
 	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/config"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/dbutil"
 )
 
 var ErrNotFound = errors.New("not found")
 
-const schema = `
+// schemaV1 is the original schema, applied as migration 1 (see migrate.go).
+const schemaV1 = `
 CREATE TABLE IF NOT EXISTS configs (id TEXT PRIMARY KEY, data TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS files (
 	config_id TEXT NOT NULL, rel_path TEXT NOT NULL, size INTEGER NOT NULL, mtime INTEGER NOT NULL,
@@ -50,21 +47,14 @@ CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT NOT NULL);
 
 type Store struct{ DB *sql.DB }
 
+// Open opens the state database at path and migrates it to the current
+// schema.
 func Open(path string) (*Store, error) {
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return nil, err
-	}
-	q := url.Values{}
-	q.Add("_pragma", "journal_mode(WAL)")
-	q.Add("_pragma", "busy_timeout(10000)")
-	q.Add("_pragma", "synchronous(NORMAL)")
-	q.Add("_txlock", "immediate")
-	db, err := sql.Open("sqlite", "file:"+filepath.ToSlash(path)+"?"+q.Encode())
+	db, err := dbutil.Open(path)
 	if err != nil {
 		return nil, err
 	}
-	db.SetMaxOpenConns(4)
-	if _, err := db.Exec(schema); err != nil {
+	if _, err := dbutil.Migrate(db, migrations, baseline); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("init state database: %w", err)
 	}
@@ -77,6 +67,9 @@ func Open(path string) (*Store, error) {
 }
 
 func (s *Store) Close() error { return s.DB.Close() }
+
+// SchemaVersion returns the applied schema version.
+func (s *Store) SchemaVersion() (int, error) { return dbutil.Version(s.DB) }
 
 func now() int64 { return time.Now().UnixMilli() }
 
@@ -444,4 +437,61 @@ func (s *Store) Get(k string) string {
 
 func (s *Store) Set(k, v string) {
 	_, _ = s.DB.Exec("INSERT INTO kv(k, v) VALUES(?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v", k, v)
+}
+
+// --- schedule_last ---
+
+// ScheduleLast returns the persisted last fire time (unix ms) of a schedule
+// trigger keyed "<automation id>/<node id>"; ok is false when never fired.
+func (s *Store) ScheduleLast(key string) (last int64, ok bool, err error) {
+	err = s.DB.QueryRow("SELECT last_fire FROM schedule_last WHERE key = ?", key).Scan(&last)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, false, nil
+	}
+	return last, err == nil, err
+}
+
+func (s *Store) SetScheduleLast(key string, last int64) error {
+	_, err := s.DB.Exec("INSERT INTO schedule_last(key, last_fire) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET last_fire = excluded.last_fire", key, last)
+	return err
+}
+
+// --- sync_base ---
+
+// SyncBase is the last agreed state of a path in a sync folder (three-way
+// merge base). MTime is unix nanoseconds.
+type SyncBase struct {
+	FolderID string
+	RelPath  string
+	NodeID   string
+	Revision int64
+	SHA256   string
+	Size     int64
+	MTime    int64
+}
+
+func (s *Store) SyncBase(folderID, rel string) (*SyncBase, error) {
+	b := SyncBase{FolderID: folderID, RelPath: rel}
+	err := s.DB.QueryRow("SELECT node_id, revision, sha256, size, mtime FROM sync_base WHERE folder_id = ? AND rel_path = ?", folderID, rel).
+		Scan(&b.NodeID, &b.Revision, &b.SHA256, &b.Size, &b.MTime)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &b, nil
+}
+
+func (s *Store) PutSyncBase(b SyncBase) error {
+	_, err := s.DB.Exec(`INSERT INTO sync_base(folder_id, rel_path, node_id, revision, sha256, size, mtime, updated_at) VALUES(?,?,?,?,?,?,?,?)
+		ON CONFLICT(folder_id, rel_path) DO UPDATE SET node_id = excluded.node_id, revision = excluded.revision, sha256 = excluded.sha256,
+		size = excluded.size, mtime = excluded.mtime, updated_at = excluded.updated_at`,
+		b.FolderID, b.RelPath, b.NodeID, b.Revision, b.SHA256, b.Size, b.MTime, now())
+	return err
+}
+
+func (s *Store) DeleteSyncBase(folderID, rel string) error {
+	_, err := s.DB.Exec("DELETE FROM sync_base WHERE folder_id = ? AND rel_path = ?", folderID, rel)
+	return err
 }

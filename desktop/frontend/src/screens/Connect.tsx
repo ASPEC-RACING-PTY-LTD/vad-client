@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { AlertTriangle, CheckCircle2, Clock, KeyRound, Loader2, Server, ShieldAlert, ShieldCheck, XCircle } from 'lucide-react'
 import { EventsOn } from '../../wailsjs/runtime/runtime'
 import { CancelEnrollment, Connect, ProbeServer } from '../../wailsjs/go/main/App'
-import type { main } from '../../wailsjs/go/models'
+import type { agent } from '../../wailsjs/go/models'
 import { Button, Field } from '../ui'
 import { errMsg } from '../lib'
 import logo from '../logo.png'
@@ -23,20 +23,20 @@ function Countdown({ until }: { until: number }) {
   )
 }
 
-export function ConnectScreen({ boot, revoked, onDone }: { boot: main.Bootstrap; revoked: boolean; onDone: () => void }) {
+export function ConnectScreen({ boot, revoked, onDone }: { boot: agent.Bootstrap; revoked: boolean; onDone: () => void }) {
   const [step, setStep] = useState<Step>(boot.enrollment?.status === 'pending' ? 'pending' : 'server')
   const [url, setUrl] = useState(boot.settings.server_url || '')
-  const [probe, setProbe] = useState<main.ProbeResult | null>(null)
+  const [probe, setProbe] = useState<agent.ProbeResult | null>(null)
   const [pin, setPin] = useState(boot.settings.pinned_cert || '')
   const [login, setLogin] = useState(boot.settings.username || '')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [enroll, setEnroll] = useState<main.EnrollView | null>(boot.enrollment ?? null)
+  const [enroll, setEnroll] = useState<agent.EnrollView | null>(boot.enrollment ?? null)
 
   useEffect(
     () =>
-      EventsOn('enrollment', (v: main.EnrollView) => {
+      EventsOn('enrollment', (v: agent.EnrollView) => {
         setEnroll(v)
         if (v.status === 'approved') {
           setStep('result')
@@ -53,7 +53,7 @@ export function ConnectScreen({ boot, revoked, onDone }: { boot: main.Bootstrap;
     setBusy(true)
     setError('')
     try {
-      const res = await ProbeServer(url, withPin)
+      const res = await ProbeServer({ url, pin: withPin })
       setProbe(res)
       setUrl(res.url)
       if (res.untrusted) setStep('trust')
@@ -70,7 +70,7 @@ export function ConnectScreen({ boot, revoked, onDone }: { boot: main.Bootstrap;
     setBusy(true)
     setError('')
     try {
-      const v = await Connect(url, login, password, pin)
+      const v = await Connect({ url, login, password, pin })
       setPassword('')
       setEnroll(v)
       setStep('pending')

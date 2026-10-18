@@ -1,0 +1,39 @@
+FULL ACCESS TO ALL TOOLS (ADVANCED)
+
+What it does
+- Everything in Simple Folder Backups, plus:
+- One-way and two-way folder sync with your VaultDock server.
+- Automations that run backups, syncs or clean-ups for you.
+- Finds installed apps, games and dev projects; reinstalls apps on a
+  new PC after you confirm each one.
+- Backs up app settings and their registry keys.
+- Snapshots (Windows shadow copies), so locked files can be backed up.
+- Protects other Windows profiles on this PC, if those users agree.
+
+Scope
+- Only the folders, apps and settings you select.
+- Another user's profile only after that user signs in, opens VaultDock
+  and agrees. VaultDock never asks for or stores passwords.
+
+Permissions
+- Same administrator install and Windows service as Simple. Files are
+  still read with each user's own Windows permissions.
+- The service also gets the Windows backup privilege, used only to read
+  snapshots. A file the user could not open is skipped.
+- Two-way sync can change files in synced folders. Deleted files go to
+  the Recycle Bin.
+- Apps are installed with winget, Chocolatey or Scoop. VaultDock itself
+  never changes Windows system files.
+- Files are encrypted on this PC before upload. As in Simple, by
+  default your VaultDock server also holds the keys, so your server
+  admin can browse and restore your files (and so could anyone who
+  takes over the server). Your admin can limit this to file names.
+
+Resources
+- Download: extra components from the official VaultDock releases on
+  GitHub, checked before use. Roughly tens of MB.
+- Memory and CPU: higher during app scans and snapshots. Snapshots
+  also use temporary disk space.
+
+Compared with Simple
+- More tools, but more permissions, downloads and resources.

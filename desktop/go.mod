@@ -7,6 +7,7 @@ replace github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk => ../sdk
 require (
 	git.sr.ht/~jackmordaunt/go-toast/v2 v2.0.3
 	github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk v0.0.0-00010101000000-000000000000
+	github.com/Microsoft/go-winio v0.6.4
 	github.com/energye/systray v1.0.3
 	github.com/rjeczalik/notify v0.9.3
 	github.com/wailsapp/wails/v2 v2.16.0
@@ -23,6 +24,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/jchv/go-winloader v0.0.0-20210711035445-715c2860da7e // indirect
+	github.com/klauspost/compress v1.20.3 // indirect
 	github.com/labstack/echo/v4 v4.13.3 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
 	github.com/leaanthony/go-ansi-parser v1.6.1 // indirect

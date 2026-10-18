@@ -8,8 +8,10 @@ import (
 )
 
 // JSONSchema returns a JSON Schema (draft 2020-12) describing the document
-// format. It is generated from the catalogue so it can never drift from the
-// validator.
+// format, v1 and v2. It is generated from the catalogue so it can never drift
+// from the validator. Rules the schema cannot express (runtime support of each
+// kind, approval overrides that may only tighten) are enforced by
+// ValidateDocument.
 func JSONSchema() map[string]any {
 	defs := map[string]any{}
 	var refs []any
@@ -17,19 +19,27 @@ func JSONSchema() map[string]any {
 		kinds := Catalog()[t]
 		for _, k := range kinds {
 			name := t + ":" + k.Kind
+			props := map[string]any{
+				"id":       map[string]any{"type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$"},
+				"type":     map[string]any{"const": t},
+				"kind":     map[string]any{"const": k.Kind},
+				"label":    map[string]any{"type": "string", "maxLength": MaxNameLen},
+				"params":   paramsSchema(k.Params),
+				"position": map[string]any{"type": "object", "properties": map[string]any{"x": map[string]any{"type": "number"}, "y": map[string]any{"type": "number"}}},
+			}
+			if t == TypeAction {
+				props["approval"] = map[string]any{
+					"enum":        []string{string(ApprovalNone), string(ApprovalOptional), string(ApprovalRequired)},
+					"description": "v2 only: raise this action's approval level; it can never be lower than the kind's catalogue policy",
+				}
+			}
 			defs[name] = map[string]any{
 				"type":                 "object",
 				"description":          k.Title + ". " + k.Description,
 				"required":             []string{"id", "type", "kind"},
 				"additionalProperties": false,
-				"properties": map[string]any{
-					"id":       map[string]any{"type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$"},
-					"type":     map[string]any{"const": t},
-					"kind":     map[string]any{"const": k.Kind},
-					"label":    map[string]any{"type": "string", "maxLength": MaxNameLen},
-					"params":   paramsSchema(k.Params),
-					"position": map[string]any{"type": "object", "properties": map[string]any{"x": map[string]any{"type": "number"}, "y": map[string]any{"type": "number"}}},
-				},
+				"properties":           props,
+				"x-runtimes":           k.Runtimes,
 			}
 			refs = append(refs, map[string]any{"$ref": "#/$defs/" + name})
 		}
@@ -44,18 +54,20 @@ func JSONSchema() map[string]any {
 	defs["rule"] = map[string]any{"oneOf": condRefs}
 	return map[string]any{
 		"$schema":              "https://json-schema.org/draft/2020-12/schema",
-		"$id":                  "https://vaultdock.dev/schema/automation-v1.json",
+		"$id":                  "https://vaultdock.dev/schema/automation-v2.json",
 		"title":                "VaultDock automation",
 		"type":                 "object",
 		"required":             []string{"schema", "name", "nodes", "edges"},
 		"additionalProperties": false,
 		"properties": map[string]any{
-			"schema":      map[string]any{"const": SchemaID},
-			"name":        map[string]any{"type": "string", "minLength": 1, "maxLength": MaxNameLen},
-			"description": map[string]any{"type": "string", "maxLength": MaxDescLen},
-			"enabled":     map[string]any{"type": "boolean"},
-			"priority":    map[string]any{"type": "integer", "minimum": -1000, "maximum": 1000},
-			"nodes":       map[string]any{"type": "array", "minItems": 2, "maxItems": MaxNodes, "items": map[string]any{"oneOf": refs}},
+			"schema":         map[string]any{"enum": []string{SchemaID, SchemaIDV2}},
+			"schema_version": map[string]any{"const": SchemaVersionV2, "description": "v2 only: optional numeric copy of the schema version"},
+			"runtime":        map[string]any{"enum": []string{RuntimeDevice, RuntimeServer}, "default": RuntimeDevice, "description": "v2 only: where the automation runs"},
+			"name":           map[string]any{"type": "string", "minLength": 1, "maxLength": MaxNameLen},
+			"description":    map[string]any{"type": "string", "maxLength": MaxDescLen},
+			"enabled":        map[string]any{"type": "boolean"},
+			"priority":       map[string]any{"type": "integer", "minimum": -1000, "maximum": 1000},
+			"nodes":          map[string]any{"type": "array", "minItems": 2, "maxItems": MaxNodes, "items": map[string]any{"oneOf": refs}},
 			"edges": map[string]any{"type": "array", "maxItems": MaxEdges, "items": map[string]any{
 				"type": "object", "required": []string{"from", "to"}, "additionalProperties": false,
 				"properties": map[string]any{
@@ -65,6 +77,9 @@ func JSONSchema() map[string]any {
 				},
 			}},
 		},
+		// v1 documents cannot use the v2 top-level fields.
+		"if":    map[string]any{"properties": map[string]any{"schema": map[string]any{"const": SchemaID}}},
+		"then":  map[string]any{"properties": map[string]any{"schema_version": false, "runtime": false}},
 		"$defs": defs,
 	}
 }
@@ -141,12 +156,12 @@ func ExampleJSON() string {
 // external AI assistant so it can generate valid automations.
 func AIGuide() string {
 	var b strings.Builder
-	b.WriteString("# VaultDock automation format (" + SchemaID + ")\n\n")
+	b.WriteString("# VaultDock automation format (" + SchemaID + ", " + SchemaIDV2 + ")\n\n")
 	b.WriteString(`You are generating a JSON automation for VaultDock, a self-hosted file sync platform.
-The desktop client evaluates automations when local files change. Output ONE JSON object only.
+The desktop client evaluates device automations when local files change; the server runs server automations itself. Output ONE JSON object only.
 
 ## Document structure
-- "schema": must be exactly "` + SchemaID + `"
+- "schema": "` + SchemaID + `" (default; works on every client) or "` + SchemaIDV2 + `" (needed only for the v2 fields below)
 - "name": short name (required), "description": optional text
 - "enabled": true or false, "priority": integer -1000..1000 (higher wins conflicts; default 0)
 - "nodes": array of nodes. Each node: {"id": "unique-id", "type": "trigger"|"condition"|"action", "kind": "<kind>", "label": "optional", "params": {...}}
@@ -155,11 +170,18 @@ The desktop client evaluates automations when local files change. Output ONE JSO
   - Edges must not form loops. Triggers cannot have incoming edges.
 - Optional "position": {"x": number, "y": number} on nodes for the visual editor (auto-layout is used if missing).
 
+## Version 2 fields (only with "schema": "` + SchemaIDV2 + `")
+- "schema_version": optional, must be ` + fmt.Sprint(SchemaVersionV2) + ` when present.
+- "runtime": "` + RuntimeDevice + `" (default: delivered to desktops) or "` + RuntimeServer + `" (run by the server). A server automation may only use kinds marked [runs on server] below.
+- "approval" on an action node: "none", "optional" or "required". It can only raise the kind's approval policy, never lower it.
+- Prefer v1 unless one of these fields is needed: older desktops only understand v1, and a v1 document is upgraded to v2 losslessly.
+
 ## Evaluation rules
 - A file is uploaded by default when it passes the sync configuration's filters. Use "sync.skip" to prevent uploads.
 - When a trigger matches, VaultDock follows its edges. A condition follows its "true" or "false" edges. Actions run and then follow "next".
 - Destination folders without a leading "/" are relative to the sync configuration's destination folder.
-- Actions never delete, move or rename the user's local files. They only affect the server copy and notifications.
+- No current action deletes, moves or renames the user's local files; they only affect the server copy and notifications.
+- Actions marked [destructive] or [approval required] never run on their own: the engine marks their operations pending until a person approves them on the server. A document cannot approve itself.
 - Byte sizes may be numbers or strings like "50 MB" (1 MB = 1048576 bytes).
 - Glob patterns: * (any characters except /), ** (any folders), ? (one character), [abc].
 - Templates use {{variable}} with optional filters, e.g. {{file.created|date:"YYYY-MM"}} or {{file.parent_name|default:"Unsorted"}}.
@@ -191,6 +213,20 @@ func writeKinds(b *strings.Builder, t string) {
 		fmt.Fprintf(b, "- %s (%s): %s", k.Kind, k.Title, k.Description)
 		if t != TypeTrigger && len(k.Contexts) > 0 {
 			fmt.Fprintf(b, " [usable with %s triggers]", strings.Join(k.Contexts, "/"))
+		}
+		for _, rt := range k.Runtimes {
+			if rt == RuntimeServer {
+				b.WriteString(" [runs on server]")
+			}
+		}
+		if k.MinSchemaVersion > SchemaVersionV1 {
+			fmt.Fprintf(b, " [needs %s]", SchemaIDFor(k.MinSchemaVersion))
+		}
+		if k.Destructive {
+			b.WriteString(" [destructive]")
+		}
+		if k.Approval == ApprovalRequired {
+			b.WriteString(" [approval required]")
 		}
 		b.WriteString("\n")
 		for _, p := range k.Params {

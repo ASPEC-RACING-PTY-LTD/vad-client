@@ -10,8 +10,16 @@ export function CheckForUpdates() {
   return window['go']['main']['App']['CheckForUpdates']();
 }
 
-export function Connect(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['App']['Connect'](arg1, arg2, arg3, arg4);
+export function ConfirmRecoveryKey(arg1) {
+  return window['go']['main']['App']['ConfirmRecoveryKey'](arg1);
+}
+
+export function ConfirmServerIdentity(arg1) {
+  return window['go']['main']['App']['ConfirmServerIdentity'](arg1);
+}
+
+export function Connect(arg1) {
+  return window['go']['main']['App']['Connect'](arg1);
 }
 
 export function DeleteConfig(arg1) {
@@ -22,8 +30,20 @@ export function Disconnect() {
   return window['go']['main']['App']['Disconnect']();
 }
 
+export function EncodeFolder(arg1) {
+  return window['go']['main']['App']['EncodeFolder'](arg1);
+}
+
 export function GetBootstrap() {
   return window['go']['main']['App']['GetBootstrap']();
+}
+
+export function GetConsentStatus() {
+  return window['go']['main']['App']['GetConsentStatus']();
+}
+
+export function GetModeState() {
+  return window['go']['main']['App']['GetModeState']();
 }
 
 export function GetSettings() {
@@ -38,12 +58,36 @@ export function GetUpdateStatus() {
   return window['go']['main']['App']['GetUpdateStatus']();
 }
 
+export function GiveProfileConsent() {
+  return window['go']['main']['App']['GiveProfileConsent']();
+}
+
+export function InitRepository(arg1) {
+  return window['go']['main']['App']['InitRepository'](arg1);
+}
+
 export function InstallUpdate() {
   return window['go']['main']['App']['InstallUpdate']();
 }
 
+export function KeyStatus() {
+  return window['go']['main']['App']['KeyStatus']();
+}
+
+export function KnownFolders() {
+  return window['go']['main']['App']['KnownFolders']();
+}
+
 export function ListAutomations() {
   return window['go']['main']['App']['ListAutomations']();
+}
+
+export function ListBackupJobs() {
+  return window['go']['main']['App']['ListBackupJobs']();
+}
+
+export function ListBackupRuns(arg1) {
+  return window['go']['main']['App']['ListBackupRuns'](arg1);
 }
 
 export function ListConfigs() {
@@ -54,8 +98,16 @@ export function ListHistory(arg1) {
   return window['go']['main']['App']['ListHistory'](arg1);
 }
 
+export function ListIssues(arg1) {
+  return window['go']['main']['App']['ListIssues'](arg1);
+}
+
 export function ListQueue(arg1) {
   return window['go']['main']['App']['ListQueue'](arg1);
+}
+
+export function ModeTexts() {
+  return window['go']['main']['App']['ModeTexts']();
 }
 
 export function OpenFolder(arg1) {
@@ -86,20 +138,44 @@ export function PreviewConfig(arg1) {
   return window['go']['main']['App']['PreviewConfig'](arg1);
 }
 
-export function ProbeServer(arg1, arg2) {
-  return window['go']['main']['App']['ProbeServer'](arg1, arg2);
+export function ProbeServer(arg1) {
+  return window['go']['main']['App']['ProbeServer'](arg1);
 }
 
 export function Quit() {
   return window['go']['main']['App']['Quit']();
 }
 
+export function Readiness() {
+  return window['go']['main']['App']['Readiness']();
+}
+
 export function RefreshAutomations() {
   return window['go']['main']['App']['RefreshAutomations']();
 }
 
+export function ResolveFolder(arg1) {
+  return window['go']['main']['App']['ResolveFolder'](arg1);
+}
+
 export function RetryFailed(arg1) {
   return window['go']['main']['App']['RetryFailed'](arg1);
+}
+
+export function RetrySkipped(arg1) {
+  return window['go']['main']['App']['RetrySkipped'](arg1);
+}
+
+export function SkipIssues(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SkipIssues'](arg1, arg2, arg3);
+}
+
+export function RunBackup(arg1) {
+  return window['go']['main']['App']['RunBackup'](arg1);
+}
+
+export function SaveBackupJob(arg1) {
+  return window['go']['main']['App']['SaveBackupJob'](arg1);
 }
 
 export function SaveConfig(arg1) {

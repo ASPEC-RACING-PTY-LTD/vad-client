@@ -423,12 +423,7 @@ func findCycle(a *Automation, out map[string][]Edge) []string {
 }
 
 func suggestKind(nodeType, kind string) string {
-	t := catalog[nodeType]
-	var names []string
-	for k := range t {
-		names = append(names, k)
-	}
-	sort.Strings(names)
+	names := DefaultRegistry.Kinds(nodeType)
 	best, bestD := "", 1<<30
 	for _, k := range names {
 		if d := levenshtein(strings.ToLower(kind), k); d < bestD {

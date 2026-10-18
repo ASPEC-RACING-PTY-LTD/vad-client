@@ -67,6 +67,24 @@ func (e *Engine) Scan(cfgID string, manual bool) (int, error) {
 	}
 	seen := map[string]bool{}
 	queued := 0
+	// skipped records an unreadable, locked or inaccessible entry once per
+	// path per scan as a visible issue (B12); the scan carries on.
+	reported := map[string]bool{}
+	skipped := func(rel string, err error) {
+		if rel == "" {
+			rel = "."
+		}
+		if reported[rel] {
+			return
+		}
+		reported[rel] = true
+		class := classifyIssue(err)
+		if class == issueNotFound && cfg.Kind != "files" {
+			return // vanished during the walk: not a skip
+		}
+		e.log.Warn("scan: skipped entry", "config", cfg.Name, "path", rel, "class", class, "err", err)
+		e.recordIssue(issueSourceScan, cfgID, rel, class, err.Error())
+	}
 	visit := func(abs string, fi os.FileInfo) {
 		rel := relPath(cfg, abs)
 		if rel == "" {
@@ -79,6 +97,12 @@ func (e *Engine) Scan(cfgID string, manual bool) (int, error) {
 		prev, known := index[rel]
 		if known && prev.Size == fi.Size() && prev.MTime == fi.ModTime().UnixNano() && prev.Status != "deleted" && prev.Status != "failed" {
 			return
+		}
+		if err := probeRead(abs); err != nil {
+			skipped(rel, err)
+			if classifyIssue(err) != issueLocked {
+				return // cannot be read at all; a locked file is still queued and deferred by the transfer
+			}
 		}
 		ev := "file.created"
 		if known && prev.Status != "deleted" {
@@ -94,7 +118,15 @@ func (e *Engine) Scan(cfgID string, manual bool) (int, error) {
 	case "files":
 		for _, p := range cfg.Files {
 			fi, err := os.Stat(p)
-			if err != nil || fi.IsDir() {
+			if err != nil {
+				rel := relPath(cfg, p)
+				if rel == "" {
+					rel = toSlash(p)
+				}
+				skipped(rel, err)
+				continue
+			}
+			if fi.IsDir() {
 				continue
 			}
 			visit(p, fi)
@@ -110,6 +142,7 @@ func (e *Engine) Scan(cfgID string, manual bool) (int, error) {
 				return e.ctx.Err()
 			}
 			if err != nil {
+				skipped(relPath(cfg, p), err)
 				if d != nil && d.IsDir() && p != root {
 					return fs.SkipDir // unreadable folder: skip, keep scanning
 				}
@@ -121,6 +154,7 @@ func (e *Engine) Scan(cfgID string, manual bool) (int, error) {
 				}
 				info, err := d.Info()
 				if err != nil {
+					skipped(relPath(cfg, p), err)
 					return fs.SkipDir
 				}
 				if !flt.WalkDir(relPath(cfg, p), isHidden(info)) {
@@ -133,6 +167,7 @@ func (e *Engine) Scan(cfgID string, manual bool) (int, error) {
 			}
 			info, err := d.Info()
 			if err != nil {
+				skipped(relPath(cfg, p), err)
 				return nil
 			}
 			visit(p, info)

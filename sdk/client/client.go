@@ -23,13 +23,16 @@ import (
 	"time"
 
 	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/protocol"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
 )
 
-// APIError is a structured error response.
+// APIError is a structured error response. Code is the api-v1 error code
+// (the wire.Code* constants) and Details the raw error.details object.
 type APIError struct {
 	Status     int
 	Code       string
 	Message    string
+	Details    json.RawMessage
 	RetryAfter time.Duration
 	Body       json.RawMessage
 }
@@ -292,47 +295,82 @@ func (c *Client) newRequest(ctx context.Context, method, path string, body io.Re
 	return req, nil
 }
 
-func (c *Client) send(req *http.Request, out any) error {
+// open sends req and returns the response for a status below 400. Error
+// responses are closed and returned as *APIError.
+func (c *Client) open(req *http.Request) (*http.Response, error) {
 	sent := time.Now()
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer resp.Body.Close()
 	c.observeServerTime(resp, sent, time.Now())
 	if resp.StatusCode >= 400 {
+		defer resp.Body.Close()
 		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-		ae := &APIError{Status: resp.StatusCode, Body: raw}
-		var env struct {
-			Error struct {
-				Code    string `json:"code"`
-				Message string `json:"message"`
-			} `json:"error"`
-		}
-		if json.Unmarshal(raw, &env) == nil {
-			ae.Code, ae.Message = env.Error.Code, env.Error.Message
-		}
-		if ra := resp.Header.Get("Retry-After"); ra != "" {
-			if s, err := strconv.Atoi(ra); err == nil {
-				ae.RetryAfter = time.Duration(s) * time.Second
-			}
-		}
-		return ae
+		return nil, decodeAPIError(resp, raw)
 	}
-	if out == nil {
+	return resp, nil
+}
+
+// decodeAPIError builds an *APIError from an error response and its body
+// (the api-v1 envelope {"error":{"code","message","details"}}).
+func decodeAPIError(resp *http.Response, raw []byte) *APIError {
+	ae := &APIError{Status: resp.StatusCode, Body: raw}
+	var env struct {
+		Error struct {
+			Code    string          `json:"code"`
+			Message string          `json:"message"`
+			Details json.RawMessage `json:"details"`
+		} `json:"error"`
+	}
+	if json.Unmarshal(raw, &env) == nil {
+		ae.Code, ae.Message, ae.Details = env.Error.Code, env.Error.Message, env.Error.Details
+	}
+	if ra := resp.Header.Get("Retry-After"); ra != "" {
+		if s, err := strconv.Atoi(ra); err == nil {
+			ae.RetryAfter = time.Duration(s) * time.Second
+		}
+	}
+	return ae
+}
+
+func (c *Client) send(req *http.Request, out any) error {
+	_, err := c.sendStatus(req, out)
+	return err
+}
+
+// sendStatus is send that also returns the success status code. An empty
+// success body leaves out untouched.
+func (c *Client) sendStatus(req *http.Request, out any) (int, error) {
+	resp, err := c.open(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+	if out == nil || resp.StatusCode == http.StatusNoContent || req.Method == http.MethodHead {
 		_, _ = io.Copy(io.Discard, resp.Body)
-		return nil
+		return resp.StatusCode, nil
 	}
-	return json.NewDecoder(resp.Body).Decode(out)
+	if err := json.NewDecoder(resp.Body).Decode(out); err != nil && !errors.Is(err, io.EOF) {
+		return resp.StatusCode, err
+	}
+	return resp.StatusCode, nil
 }
 
 func (c *Client) do(ctx context.Context, method, path string, in, out any, sign bool) error {
+	_, err := c.doStatus(ctx, method, path, in, out, sign, nil)
+	return err
+}
+
+// doStatus performs a JSON request with optional extra (unsigned) headers
+// and returns the success status code.
+func (c *Client) doStatus(ctx context.Context, method, path string, in, out any, sign bool, hdr http.Header) (int, error) {
 	var body []byte
 	if in != nil {
 		var err error
 		body, err = json.Marshal(in)
 		if err != nil {
-			return err
+			return 0, err
 		}
 	}
 	var rdr io.Reader
@@ -341,12 +379,15 @@ func (c *Client) do(ctx context.Context, method, path string, in, out any, sign 
 	}
 	req, err := c.newRequest(ctx, method, path, rdr, protocol.SHA256Hex(body), int64(len(body)), sign)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	return c.send(req, out)
+	for k, v := range hdr {
+		req.Header[k] = v
+	}
+	return c.sendStatus(req, out)
 }
 
 // Call performs a signed JSON request.
@@ -364,6 +405,11 @@ type EnrollRequest struct {
 	Identifier    string `json:"identifier"`
 	PublicKey     string `json:"public_key"`
 	ClientVersion string `json:"client_version"`
+	// api-v1 §5A key-exchange fields, required for new clients and omitted
+	// by older callers that do not set them.
+	BoxPub      string `json:"box_pub,omitempty"`
+	InstallMode string `json:"install_mode,omitempty"`
+	CoreVersion string `json:"core_version,omitempty"`
 }
 
 type EnrollResponse struct {
@@ -390,6 +436,9 @@ type EnrollStatus struct {
 	Status    string `json:"status"`
 	DeviceID  int64  `json:"device_id"`
 	ExpiresAt int64  `json:"expires_at"`
+	// ServerIdentity is set after approval (api-v1 §5A). The device pins
+	// its SIKFingerprint (see CheckSIKPin).
+	ServerIdentity *wire.ServerIdentity `json:"server_identity,omitempty"`
 }
 
 // EnrollStatus polls the approval state.
@@ -428,6 +477,8 @@ type Me struct {
 		MaxConcurrentChunks int    `json:"max_concurrent_chunks"`
 		SiteName            string `json:"site_name"`
 	} `json:"server"`
+	// Features are the api-v1 §1.3 feature flags (wire.Feature*).
+	Features []string `json:"features"`
 }
 
 func (c *Client) Me(ctx context.Context) (*Me, error) {
@@ -478,4 +529,119 @@ type NotificationReport struct {
 
 func (c *Client) Notify(ctx context.Context, items []NotificationReport) error {
 	return c.Call(ctx, "POST", "/api/v1/device/notifications", map[string]any{"notifications": items}, nil)
+}
+
+// --- response helpers ---
+
+// apiPath joins the /api/v1 prefix, a path and an optional query.
+func apiPath(path string, q url.Values) string {
+	p := "/api/v1" + path
+	if enc := q.Encode(); enc != "" {
+		p += "?" + enc
+	}
+	return p
+}
+
+// listQuery returns the api-v1 list parameters (cursor, limit) as a query.
+func listQuery(cursor string, limit int) url.Values {
+	q := url.Values{}
+	if cursor != "" {
+		q.Set("cursor", cursor)
+	}
+	if limit > 0 {
+		q.Set("limit", strconv.Itoa(limit))
+	}
+	return q
+}
+
+// Accepted is a decoded 202 reply: a long operation
+// (`{"operation_id"}`) or a gated action awaiting approval
+// (`{"approval_id","operation_id"|null}`). Exactly one of the two is set.
+type Accepted struct {
+	Operation *wire.OperationAccepted
+	Approval  *wire.ApprovalAccepted
+}
+
+// ParseAccepted decodes a 202 body into Accepted.
+func ParseAccepted(raw []byte) (*Accepted, error) {
+	var probe map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &probe); err != nil {
+		return nil, err
+	}
+	if _, ok := probe["approval_id"]; ok {
+		var a wire.ApprovalAccepted
+		if err := json.Unmarshal(raw, &a); err != nil {
+			return nil, err
+		}
+		return &Accepted{Approval: &a}, nil
+	}
+	if _, ok := probe["operation_id"]; ok {
+		var o wire.OperationAccepted
+		if err := json.Unmarshal(raw, &o); err != nil {
+			return nil, err
+		}
+		return &Accepted{Operation: &o}, nil
+	}
+	return nil, errors.New("202 reply carries neither operation_id nor approval_id")
+}
+
+// CallAccepted performs a signed JSON request that answers 202 with an
+// operation or approval reference.
+func (c *Client) CallAccepted(ctx context.Context, method, path string, in any) (*Accepted, error) {
+	var raw json.RawMessage
+	st, err := c.doStatus(ctx, method, path, in, &raw, true, nil)
+	if err != nil {
+		return nil, err
+	}
+	if st != http.StatusAccepted {
+		return nil, fmt.Errorf("expected 202 Accepted, got HTTP %d", st)
+	}
+	return ParseAccepted(raw)
+}
+
+// Operation returns a long operation this device created (api-v1 §3).
+func (c *Client) Operation(ctx context.Context, id int64) (*wire.Operation, error) {
+	var out wire.Operation
+	if err := c.Call(ctx, "GET", apiPath(fmt.Sprintf("/operations/%d", id), nil), nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ModuleUnavailableDetails are the details of 409 module_unavailable
+// (api-v1 §1.1, §6A).
+type ModuleUnavailableDetails struct {
+	Module   string `json:"module"`
+	DeviceID int64  `json:"device_id"`
+}
+
+// DecodeDetails unmarshals error.details into v. It returns false when the
+// error has no details or they do not decode.
+func (e *APIError) DecodeDetails(v any) bool {
+	if len(e.Details) == 0 || string(e.Details) == "null" {
+		return false
+	}
+	return json.Unmarshal(e.Details, v) == nil
+}
+
+// ModuleUnavailable returns the details of a 409 module_unavailable error.
+func ModuleUnavailable(err error) (*ModuleUnavailableDetails, bool) {
+	var ae *APIError
+	if !errors.As(err, &ae) || ae.Code != wire.CodeModuleUnavailable {
+		return nil, false
+	}
+	var d ModuleUnavailableDetails
+	ae.DecodeDetails(&d)
+	return &d, true
+}
+
+// RepoLocked returns the details of a 409 repo_locked error.
+func RepoLocked(err error) (*wire.LockedDetails, bool) {
+	var ae *APIError
+	if !errors.As(err, &ae) || ae.Code != wire.CodeRepoLocked {
+		return nil, false
+	}
+	var d wire.LockedDetails
+	ae.DecodeDetails(&d)
+	return &d, true
 }
