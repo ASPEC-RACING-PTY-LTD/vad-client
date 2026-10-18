@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"log/slog"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -391,6 +392,25 @@ func (e *Engine) Paused() bool {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	return e.paused
+}
+
+// ResetSyncIn forgets the upload index, queue and history of the
+// configurations in only (nil = all) and clears their run statistics, so the
+// next scan uploads everything again (for example to a fresh server).
+func (e *Engine) ResetSyncIn(only []string) (int64, error) {
+	n, err := e.st.ResetSyncIn(only)
+	if err != nil {
+		return 0, err
+	}
+	e.mu.Lock()
+	for id := range e.runs {
+		if only == nil || slices.Contains(only, id) {
+			delete(e.runs, id)
+		}
+	}
+	e.mu.Unlock()
+	e.refreshStatus()
+	return n, nil
 }
 
 // RetryFailed moves failed items back into the queue.

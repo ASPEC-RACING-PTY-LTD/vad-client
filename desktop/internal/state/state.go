@@ -197,6 +197,29 @@ func (s *Store) ResetIndex() error {
 	return err
 }
 
+// ResetSyncIn forgets what was uploaded for the configurations in only (nil
+// = all): the file index, the queue and the transfer history. The next scan
+// uploads everything again. It returns how many indexed files were dropped.
+func (s *Store) ResetSyncIn(only []string) (int64, error) {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	var n int64
+	for _, table := range []string{"files", "queue", "history"} {
+		q, args := inConfigs("DELETE FROM "+table+" WHERE 1 = 1", nil, only)
+		res, err := tx.Exec(q, args...)
+		if err != nil {
+			return 0, err
+		}
+		if table == "files" {
+			n, _ = res.RowsAffected()
+		}
+	}
+	return n, tx.Commit()
+}
+
 // --- queue ---
 
 type Item struct {

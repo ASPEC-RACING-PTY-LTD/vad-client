@@ -170,6 +170,10 @@ export function ResolveFolder(arg1) {
   return window['go']['main']['App']['ResolveFolder'](arg1);
 }
 
+export function ResetSyncData() {
+  return window['go']['main']['App']['ResetSyncData']();
+}
+
 export function RetryFailed(arg1) {
   return window['go']['main']['App']['RetryFailed'](arg1);
 }

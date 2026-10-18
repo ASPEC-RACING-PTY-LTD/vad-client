@@ -73,6 +73,7 @@ var methodAccess = map[string]Access{
 	"SyncNow":            AccessUser,
 	"PreviewConfig":      AccessUser,
 	"RetryFailed":        AccessUser,
+	"ResetSyncData":      AccessUser,
 	"RefreshAutomations": AccessUser,
 	"SaveBackupJob":      AccessUser,
 	"DeleteBackupJob":    AccessUser,

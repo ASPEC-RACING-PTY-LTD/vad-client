@@ -115,6 +115,10 @@ func (c *InProc) SetPaused(ctx context.Context, paused bool) error {
 	return callErr(ctx, paused, c.api.SetPaused)
 }
 
+func (c *InProc) ResetSyncData(ctx context.Context) (int64, error) {
+	return call0(ctx, c.api.ResetSyncData)
+}
+
 func (c *InProc) RetryFailed(ctx context.Context, id int64) (int64, error) {
 	return call(ctx, id, c.api.RetryFailed)
 }

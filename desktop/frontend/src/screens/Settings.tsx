@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { ArrowUpCircle, FileText, LogOut, RefreshCw } from 'lucide-react'
-import { CheckForUpdates, Disconnect, GetSettings, GetUpdateStatus, InstallUpdate, OpenLogsFolder, OpenURL, SaveSettings } from '../../wailsjs/go/main/App'
+import { ArrowUpCircle, FileText, LogOut, RefreshCw, RotateCcw } from 'lucide-react'
+import { CheckForUpdates, Disconnect, GetSettings, GetUpdateStatus, InstallUpdate, OpenLogsFolder, OpenURL, ResetSyncData, SaveSettings } from '../../wailsjs/go/main/App'
 import type { agent, config, updater } from '../../wailsjs/go/models'
 import { EventsOn } from '../../wailsjs/runtime/runtime'
 import { Button, Field, PageLoader, Toggle, useUI } from '../ui'
@@ -100,7 +100,29 @@ export function SettingsScreen({ boot, onChanged }: { boot: agent.Bootstrap; onC
           <dt className="text-slate-500">Certificate</dt>
           <dd className="font-mono text-xs break-all">{boot.settings.pinned_cert ? `pinned ${boot.settings.pinned_cert.slice(0, 32)}…` : 'verified by Windows'}</dd>
         </dl>
-        <div className="pt-2">
+        <div className="flex flex-wrap gap-2 pt-2">
+          <Button
+            icon={<RotateCcw className="size-4" />}
+            onClick={async () => {
+              if (
+                await confirm({
+                  title: 'Reset sync data?',
+                  message:
+                    'This PC forgets which files it has already uploaded and clears its transfer history, then scans your sync folders and uploads everything again. Use it after the server was set up fresh. Your local files, sync folders and files already in VaultDock are not changed.',
+                  confirmLabel: 'Reset and re-upload',
+                })
+              ) {
+                try {
+                  const n = await ResetSyncData()
+                  toast('success', 'Sync data reset', `${n} file record(s) cleared. Your folders are being scanned and uploaded again.`)
+                } catch (e) {
+                  toast('error', 'Could not reset sync data', errMsg(e))
+                }
+              }
+            }}
+          >
+            Reset sync data
+          </Button>
           <Button
             variant="danger"
             icon={<LogOut className="size-4" />}

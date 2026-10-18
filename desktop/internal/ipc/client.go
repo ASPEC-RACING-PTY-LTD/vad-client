@@ -576,6 +576,10 @@ func (c *Client) SetPaused(ctx context.Context, paused bool) error {
 	return c.call(ctx, "SetPaused", paused, nil)
 }
 
+func (c *Client) ResetSyncData(ctx context.Context) (int64, error) {
+	return invoke[int64](c, ctx, "ResetSyncData", nil)
+}
+
 func (c *Client) RetryFailed(ctx context.Context, id int64) (int64, error) {
 	return invoke[int64](c, ctx, "RetryFailed", id)
 }

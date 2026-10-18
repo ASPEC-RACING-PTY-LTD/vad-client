@@ -847,6 +847,18 @@ func (h *Host) SetPaused(ctx context.Context, paused bool) error {
 	return err
 }
 
+func (h *Host) ResetSyncData(ctx context.Context) (int64, error) {
+	if err := h.live(); err != nil {
+		return 0, err
+	}
+	n, err := h.eng.ResetSyncIn(h.ownedIDs(h.scopeOf(ctx)))
+	if err != nil {
+		return 0, err
+	}
+	h.log.Info("sync data reset; rescanning", "files", n)
+	return n, h.SyncNow(ctx, "")
+}
+
 func (h *Host) RetryFailed(ctx context.Context, id int64) (int64, error) {
 	if err := h.live(); err != nil {
 		return 0, err

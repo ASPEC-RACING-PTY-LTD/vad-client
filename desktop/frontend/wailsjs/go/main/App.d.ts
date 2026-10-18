@@ -91,6 +91,8 @@ export function RefreshAutomations():Promise<Array<engine.AutomationView>>;
 
 export function ResolveFolder(arg1:string):Promise<string>;
 
+export function ResetSyncData():Promise<number>;
+
 export function RetryFailed(arg1:number):Promise<number>;
 
 export function RetrySkipped(arg1:number):Promise<number>;

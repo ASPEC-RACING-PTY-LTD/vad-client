@@ -61,6 +61,10 @@ type API interface {
 
 	Snapshot(ctx context.Context) (engine.Snapshot, error)
 	SetPaused(ctx context.Context, paused bool) error
+	// ResetSyncData forgets what was uploaded from the caller's folders (file
+	// index, queue, history) and rescans them, so everything is uploaded
+	// again. Returns the number of files forgotten.
+	ResetSyncData(ctx context.Context) (int64, error)
 	// RetryFailed re-queues one failed item, or all of them when id is 0.
 	RetryFailed(ctx context.Context, id int64) (int64, error)
 	// ListQueue lists queue items; status is "", pending, active or failed.
