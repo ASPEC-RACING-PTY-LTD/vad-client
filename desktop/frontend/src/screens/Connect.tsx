@@ -83,7 +83,7 @@ export function ConnectScreen({ boot, revoked, onDone }: { boot: agent.Bootstrap
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-6 py-10">
+    <div className="relative flex min-h-full items-center justify-center overflow-hidden px-6 py-10">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(99,102,241,0.18),transparent_60%),radial-gradient(ellipse_at_bottom_right,rgba(14,165,233,0.14),transparent_55%)]" />
       <div className="relative w-full max-w-lg">
         <div className="mb-6 flex flex-col items-center text-center">

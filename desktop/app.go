@@ -196,3 +196,17 @@ func openFolder(p string) {
 	// explorer.exe with a single, validated directory argument (no shell).
 	_ = exec.Command("explorer.exe", filepath.Clean(p)).Start()
 }
+
+// CloseWindow is the title bar's close button: it hides to the tray when
+// "close to tray" is on, otherwise it quits like the system close button.
+func (a *App) CloseWindow() {
+	ctx := a.wctx()
+	if ctx == nil {
+		return
+	}
+	if s, err := a.GetSettings(); err == nil && s.CloseToTray {
+		wruntime.WindowHide(ctx)
+		return
+	}
+	wruntime.Quit(ctx)
+}

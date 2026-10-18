@@ -81,6 +81,8 @@ export function Elevation():Promise<main.Elevation>;
 
 export function RestartAsAdmin():Promise<void>;
 
+export function CloseWindow():Promise<void>;
+
 export function Quit():Promise<void>;
 
 export function Readiness():Promise<agent.BackupReadiness>;

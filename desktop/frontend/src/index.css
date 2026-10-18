@@ -5,16 +5,29 @@
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
-  --color-brand-50: #eef2ff;
-  --color-brand-100: #e0e7ff;
-  --color-brand-200: #c7d2fe;
-  --color-brand-300: #a5b4fc;
-  --color-brand-400: #818cf8;
-  --color-brand-500: #6366f1;
-  --color-brand-600: #4f46e5;
-  --color-brand-700: #4338ca;
-  --color-brand-800: #3730a3;
-  --color-brand-900: #312e81;
+  /* Linear-style palette: neutral greys (slate is remapped so every screen
+     picks them up) and a muted indigo accent. */
+  --color-slate-50: #f7f7f8;
+  --color-slate-100: #f0f0f2;
+  --color-slate-200: #e4e4e8;
+  --color-slate-300: #d0d0d6;
+  --color-slate-400: #9d9da6;
+  --color-slate-500: #7b7b85;
+  --color-slate-600: #5c5c66;
+  --color-slate-700: #3e3e46;
+  --color-slate-800: #26262b;
+  --color-slate-900: #18181b;
+  --color-slate-950: #0f0f11;
+  --color-brand-50: #f0f1fb;
+  --color-brand-100: #e2e4f7;
+  --color-brand-200: #c8cdf0;
+  --color-brand-300: #a6ade6;
+  --color-brand-400: #8189dc;
+  --color-brand-500: #5e6ad2;
+  --color-brand-600: #4f5ac0;
+  --color-brand-700: #434ca3;
+  --color-brand-800: #383f84;
+  --color-brand-900: #2f3569;
 }
 
 @layer base {
@@ -23,7 +36,33 @@
     text-rendering: optimizeLegibility;
   }
   body {
-    @apply bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-200;
+    @apply bg-slate-100 text-[13.5px] text-slate-800 dark:bg-slate-950 dark:text-slate-200;
+    user-select: none; /* app chrome, not a document; inputs and .select-text opt back in */
+  }
+  input,
+  textarea,
+  [contenteditable],
+  .select-text {
+    user-select: text;
+  }
+  /* Quiet overlay-style scrollbars: invisible track, a slim thumb that
+     darkens on hover (WebView2 / Chromium). */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background-clip: padding-box;
+    background-color: rgb(120 120 130 / 0.25);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(120 120 130 / 0.5);
   }
   ::selection {
     @apply bg-brand-500/25;
@@ -47,16 +86,16 @@
 
 @layer components {
   .card {
-    @apply rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900;
+    @apply rounded-xl border border-slate-200 bg-white dark:border-white/[.07] dark:bg-white/[.025];
   }
   .input {
-    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-xs placeholder:text-slate-400 transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100;
+    @apply w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none disabled:opacity-60 dark:border-white/[.08] dark:bg-white/[.03] dark:text-slate-100;
   }
   .label {
     @apply mb-1.5 block text-xs font-semibold tracking-wide text-slate-600 uppercase dark:text-slate-400;
   }
   .scroll-thin {
-    scrollbar-width: thin;
+    /* scrollbars are styled globally (::-webkit-scrollbar) */
   }
   .no-scrollbar {
     scrollbar-width: none;

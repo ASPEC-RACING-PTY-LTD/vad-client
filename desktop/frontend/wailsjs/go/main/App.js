@@ -150,6 +150,10 @@ export function RestartAsAdmin() {
   return window['go']['main']['App']['RestartAsAdmin']();
 }
 
+export function CloseWindow() {
+  return window['go']['main']['App']['CloseWindow']();
+}
+
 export function Quit() {
   return window['go']['main']['App']['Quit']();
 }

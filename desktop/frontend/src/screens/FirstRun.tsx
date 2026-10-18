@@ -55,7 +55,7 @@ export function FirstRun({ initial, onDone, onSkip }: { initial: agent.KeyStatus
   }
 
   return (
-    <div className="flex min-h-screen items-start justify-center bg-slate-50 px-6 py-10 dark:bg-slate-950">
+    <div className="flex min-h-full items-start justify-center px-6 py-10">
       <div className="w-full max-w-2xl">
         <div className="mb-6 flex items-center gap-3">
           <img src={logo} alt="" className="size-9 object-contain" />

@@ -108,12 +108,12 @@ export function App() {
   const status = snap?.status ?? 'offline'
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <aside className="flex w-60 shrink-0 flex-col border-r border-slate-200 bg-white px-3 py-5 dark:border-slate-800 dark:bg-slate-950">
+    <div className="flex h-full overflow-hidden">
+      <aside className="flex w-56 shrink-0 flex-col px-2.5 pt-1 pb-3">
         <div className="mb-3 flex items-center gap-2.5 px-2">
-          <img src={logo} alt="" className="size-8 object-contain" />
+          <img src={logo} alt="" className="size-6 object-contain" />
           <div>
-            <div className="text-base leading-tight font-semibold">VaultDock</div>
+            <div className="text-[13px] leading-tight font-semibold">VaultDock</div>
             <div className="text-[11px] text-slate-500">{boot.user ? `${boot.user} · ` : ''}desktop {boot.version}</div>
           </div>
         </div>
@@ -122,21 +122,21 @@ export function App() {
         </button>
         <nav className="flex flex-col gap-0.5">
           {nav.map((n) => (
-            <button key={n.id} onClick={() => setTab(n.id)} aria-current={current === n.id ? 'page' : undefined} className={cx('flex items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium transition', current === n.id ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800/70')}>
-              <n.icon className="size-[18px]" />
+            <button key={n.id} onClick={() => setTab(n.id)} aria-current={current === n.id ? 'page' : undefined} className={cx('flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[13px] font-medium transition-colors', current === n.id ? 'bg-slate-900/[.07] text-slate-900 dark:bg-white/[.07] dark:text-slate-50' : 'text-slate-600 hover:bg-slate-900/[.04] hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/[.04] dark:hover:text-slate-200')}>
+              <n.icon className="size-4 opacity-80" />
               {n.label}
               {n.id === 'transfers' && (snap?.stats.failed ?? 0) > 0 && <span className="ml-auto rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">{snap?.stats.failed}</span>}
             </button>
           ))}
         </nav>
         <div className="mt-auto space-y-2">
-          <button onClick={() => OpenWebInterface('/')} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800">
+          <button onClick={() => OpenWebInterface('/')} className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] text-slate-500 hover:bg-slate-900/[.04] hover:text-slate-900 dark:hover:bg-white/[.04] dark:hover:text-slate-200">
             <Globe className="size-4" /> Open web interface
           </button>
         </div>
       </aside>
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-slate-200 bg-white/80 px-6 dark:border-slate-800 dark:bg-slate-950/80">
+      <div className="mr-2 mb-2 flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgb(0_0_0/0.04)] dark:border-white/[.06] dark:bg-slate-900">
+        <header className="flex h-12 shrink-0 items-center gap-3 border-b border-slate-200/80 px-5 dark:border-white/[.06]">
           {syncOn ? (
             <>
               <Badge tone={statusTone[status]}>{statusLabel[status] ?? status}</Badge>
@@ -157,7 +157,7 @@ export function App() {
             )}
           </div>
         </header>
-        <main className="scroll-thin min-h-0 flex-1 overflow-y-auto px-6 py-6">
+        <main className="scroll-thin min-h-0 flex-1 overflow-y-auto px-6 py-5">
           <AdminBanner />
           {keys && !keys.available && (
             <div role="status" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm dark:border-amber-700 dark:bg-amber-500/10">

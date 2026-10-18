@@ -8,22 +8,22 @@ export function cx(...c: (string | false | null | undefined)[]) {
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'success'
 const variants: Record<Variant, string> = {
-  primary: 'bg-brand-600 text-white hover:bg-brand-700 shadow-sm shadow-brand-600/20 disabled:hover:bg-brand-600',
-  secondary: 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800',
-  ghost: 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
-  danger: 'bg-rose-600 text-white hover:bg-rose-700 shadow-sm',
-  success: 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm',
+  primary: 'bg-brand-500 text-white hover:bg-brand-600 shadow-[inset_0_1px_0_rgb(255_255_255/0.12)] disabled:hover:bg-brand-500',
+  secondary: 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-white/[.08] dark:bg-white/[.04] dark:text-slate-200 dark:hover:bg-white/[.08]',
+  ghost: 'text-slate-600 hover:bg-slate-900/[.05] dark:text-slate-300 dark:hover:bg-white/[.06]',
+  danger: 'bg-rose-600 text-white hover:bg-rose-700',
+  success: 'bg-emerald-600 text-white hover:bg-emerald-700',
 }
 
 export function Button({ variant = 'secondary', size = 'md', loading, icon, children, className, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: 'sm' | 'md' | 'lg'; loading?: boolean; icon?: ReactNode }) {
-  const sizes = { sm: 'h-8 px-2.5 text-xs gap-1.5', md: 'h-9 px-3.5 text-sm gap-2', lg: 'h-11 px-5 text-sm gap-2' }
+  const sizes = { sm: 'h-7 px-2.5 text-xs gap-1.5', md: 'h-8 px-3 text-[13px] gap-2', lg: 'h-10 px-4 text-sm gap-2' }
   return (
     <button
       {...rest}
       type={rest.type ?? 'button'}
       disabled={rest.disabled || loading}
       aria-busy={loading || undefined}
-      className={cx('inline-flex shrink-0 items-center justify-center rounded-lg font-medium whitespace-nowrap transition disabled:cursor-not-allowed disabled:opacity-50', sizes[size], variants[variant], className)}
+      className={cx('inline-flex shrink-0 items-center justify-center rounded-md font-medium whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-50', sizes[size], variants[variant], className)}
     >
       {loading ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : icon}
       {children}

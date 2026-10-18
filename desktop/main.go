@@ -92,8 +92,11 @@ func main() {
 		MinWidth:          920,
 		MinHeight:         600,
 		StartHidden:       startHidden,
+		// Frameless: the UI draws its own title bar (TitleBar.tsx); Windows 11
+		// still adds the shadow, rounded corners and snap layouts.
+		Frameless: true,
 		HideWindowOnClose: settings.CloseToTray,
-		BackgroundColour:  &options.RGBA{R: 248, G: 250, B: 252, A: 255},
+		BackgroundColour:  &options.RGBA{R: 16, G: 16, B: 18, A: 255},
 		AssetServer:       &assetserver.Options{Assets: assets},
 		OnStartup: func(ctx context.Context) {
 			app.startup(ctx)
