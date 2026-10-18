@@ -14,7 +14,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vaultdock/vaultdock/pkg/release"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/release"
 )
 
 // fakeGitHub serves the releases API and asset downloads in-process. The

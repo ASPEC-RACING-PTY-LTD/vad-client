@@ -18,10 +18,10 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/windows"
 	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
-	"github.com/vaultdock/vaultdock/desktop/internal/config"
-	"github.com/vaultdock/vaultdock/desktop/internal/engine"
-	"github.com/vaultdock/vaultdock/desktop/internal/platform"
-	"github.com/vaultdock/vaultdock/desktop/internal/state"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/config"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/engine"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/platform"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/state"
 )
 
 //go:embed all:frontend/dist

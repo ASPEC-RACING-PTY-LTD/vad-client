@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/vaultdock/vaultdock/pkg/client"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/client"
 )
 
 // Version is the desktop client version reported to the server.

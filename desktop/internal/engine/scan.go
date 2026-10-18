@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vaultdock/vaultdock/desktop/internal/config"
-	"github.com/vaultdock/vaultdock/desktop/internal/filter"
-	"github.com/vaultdock/vaultdock/desktop/internal/state"
-	"github.com/vaultdock/vaultdock/pkg/automation"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/config"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/filter"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/state"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/automation"
 )
 
 func toSlash(p string) string { return strings.ReplaceAll(p, `\`, "/") }

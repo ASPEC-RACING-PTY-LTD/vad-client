@@ -10,9 +10,9 @@ import (
 
 	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
-	"github.com/vaultdock/vaultdock/desktop/internal/engine"
-	"github.com/vaultdock/vaultdock/desktop/internal/platform"
-	"github.com/vaultdock/vaultdock/desktop/internal/updater"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/engine"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/platform"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/updater"
 )
 
 const (

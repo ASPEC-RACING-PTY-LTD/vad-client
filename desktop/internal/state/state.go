@@ -16,7 +16,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"github.com/vaultdock/vaultdock/desktop/internal/config"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/config"
 )
 
 var ErrNotFound = errors.New("not found")

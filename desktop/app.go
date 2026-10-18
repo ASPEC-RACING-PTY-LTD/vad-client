@@ -18,13 +18,13 @@ import (
 
 	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
-	"github.com/vaultdock/vaultdock/desktop/internal/config"
-	"github.com/vaultdock/vaultdock/desktop/internal/engine"
-	"github.com/vaultdock/vaultdock/desktop/internal/platform"
-	"github.com/vaultdock/vaultdock/desktop/internal/state"
-	"github.com/vaultdock/vaultdock/desktop/internal/updater"
-	"github.com/vaultdock/vaultdock/pkg/client"
-	"github.com/vaultdock/vaultdock/pkg/protocol"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/config"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/engine"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/platform"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/state"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/updater"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/client"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/protocol"
 )
 
 // UpdateRepo is the GitHub repository checked for new releases

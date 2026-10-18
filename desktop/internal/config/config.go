@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vaultdock/vaultdock/pkg/automation"
-	"github.com/vaultdock/vaultdock/pkg/pathutil"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/automation"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/pathutil"
 )
 
 // SyncConfig describes one selection of local files to synchronise.

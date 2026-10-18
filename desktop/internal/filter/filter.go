@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vaultdock/vaultdock/desktop/internal/config"
-	"github.com/vaultdock/vaultdock/pkg/automation"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/config"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/automation"
 )
 
 // Filter is a compiled view of a SyncConfig's selection rules.

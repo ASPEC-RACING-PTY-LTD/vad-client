@@ -20,8 +20,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/vaultdock/vaultdock/pkg/release"
-	"github.com/vaultdock/vaultdock/pkg/version"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/release"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/version"
 )
 
 // InstallerPattern matches the Windows installer attached to each release.

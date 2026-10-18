@@ -14,8 +14,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/vaultdock/vaultdock/desktop/internal/state"
-	"github.com/vaultdock/vaultdock/pkg/client"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/state"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/client"
 )
 
 const (

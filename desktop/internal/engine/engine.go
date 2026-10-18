@@ -22,11 +22,11 @@ import (
 
 	"golang.org/x/time/rate"
 
-	"github.com/vaultdock/vaultdock/desktop/internal/config"
-	"github.com/vaultdock/vaultdock/desktop/internal/filter"
-	"github.com/vaultdock/vaultdock/desktop/internal/state"
-	"github.com/vaultdock/vaultdock/pkg/automation"
-	"github.com/vaultdock/vaultdock/pkg/client"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/config"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/filter"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/state"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/automation"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/client"
 )
 
 // Notifier shows a desktop notification.

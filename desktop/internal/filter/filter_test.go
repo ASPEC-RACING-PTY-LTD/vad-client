@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vaultdock/vaultdock/desktop/internal/config"
+	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/desktop/internal/config"
 )
 
 func TestFilterRules(t *testing.T) {
