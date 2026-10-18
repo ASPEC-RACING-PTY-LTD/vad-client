@@ -18,6 +18,7 @@ import { ModeScreen } from './screens/Mode'
 import { enabledModules, modeLabel, screenVisible, type ScreenId } from './modules/registry'
 import { useMode } from './modules/useMode'
 import { AdminBanner } from './admin'
+import { apiMessage } from './api'
 import logo from './logo.png'
 
 type Tab = ScreenId
@@ -147,11 +148,11 @@ export function App() {
           )}
           <div className="ml-auto">
             {!syncOn ? null : snap?.paused ? (
-              <Button size="sm" variant="primary" icon={<Play className="size-3.5" />} onClick={() => SetPaused(false).then(() => toast('success', 'Synchronisation resumed'))}>
+              <Button size="sm" variant="primary" icon={<Play className="size-3.5" />} onClick={() => SetPaused(false).then(() => toast('success', 'Synchronisation resumed')).catch((e) => toast('error', 'Could not resume', apiMessage(e)))}>
                 Resume
               </Button>
             ) : (
-              <Button size="sm" icon={<Pause className="size-3.5" />} onClick={() => SetPaused(true).then(() => toast('info', 'Synchronisation paused', 'In-progress uploads stop and resume later from where they left off.'))}>
+              <Button size="sm" icon={<Pause className="size-3.5" />} onClick={() => SetPaused(true).then(() => toast('info', 'Synchronisation paused', 'In-progress uploads stop and resume later from where they left off.')).catch((e) => toast('error', 'Could not pause', apiMessage(e)))}>
                 Pause
               </Button>
             )}

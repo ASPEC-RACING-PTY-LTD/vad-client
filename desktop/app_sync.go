@@ -65,7 +65,7 @@ func (a *App) SuggestFolders() map[string]string {
 
 func (a *App) GetSnapshot() (engine.Snapshot, error) { return a.api.Snapshot(a.bg) }
 
-func (a *App) SetPaused(p bool) error { return a.api.SetPaused(a.bg, p) }
+func (a *App) SetPaused(p bool) error { return uiError(a.api.SetPaused(a.bg, p)) }
 
 // RetryFailed requeues one failed item, or all of them when id is 0.
 func (a *App) RetryFailed(id int64) (int64, error) { return a.api.RetryFailed(a.bg, id) }

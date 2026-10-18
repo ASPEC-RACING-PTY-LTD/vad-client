@@ -18,6 +18,8 @@ export function apiError(e: unknown): ApiError {
 // needs a Windows administrator.
 export function apiMessage(e: unknown): string {
   const err = apiError(e)
+  // Bindings that return the agent's plain error text still mean forbidden.
+  if (!err.code && /requires an elevated administrator|^forbidden:/i.test(err.message)) err.code = 'forbidden'
   switch (err.code) {
     case 'forbidden':
       window.dispatchEvent(new Event('vaultdock:needs-admin'))
