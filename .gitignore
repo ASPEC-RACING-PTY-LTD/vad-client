@@ -15,6 +15,7 @@ node_modules/
 web/dist/*
 !web/dist/.keep
 /tmp/*
+/tmp/
 
 # local tooling
 .claude/
