@@ -34,6 +34,8 @@ type Notifier func(title, message, level string)
 
 type activeTransfer struct {
 	item     state.Item
+	ctx      context.Context
+	cancel   context.CancelFunc // pause stops the transfer; the item is requeued
 	phase    atomic.Value // string
 	sent     atomic.Int64
 	size     int64
@@ -381,10 +383,21 @@ func commonDir(files []string) string {
 
 // --- pause / resume ---
 
+// SetPaused pauses or resumes synchronisation. Pausing also stops the
+// transfers in progress: they go back to the queue and start again (resuming
+// the server-side upload session) when synchronisation is resumed.
 func (e *Engine) SetPaused(p bool) {
 	e.mu.Lock()
 	e.paused = p
+	if p {
+		for _, at := range e.active {
+			if at.cancel != nil {
+				at.cancel()
+			}
+		}
+	}
 	e.mu.Unlock()
+	e.refreshStatus()
 	e.kick()
 }
 

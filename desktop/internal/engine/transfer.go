@@ -75,6 +75,7 @@ func (e *Engine) dispatch() {
 	}
 	for _, it := range items {
 		at := &activeTransfer{item: it, size: it.Size, started: time.Now(), lastT: time.Now()}
+		at.ctx, at.cancel = context.WithCancel(e.ctx)
 		at.phase.Store("starting")
 		e.mu.Lock()
 		e.active[it.ID] = at
@@ -83,6 +84,7 @@ func (e *Engine) dispatch() {
 		go func() {
 			defer e.wg.Done()
 			e.process(at)
+			at.cancel()
 			e.mu.Lock()
 			delete(e.active, at.item.ID)
 			e.mu.Unlock()
@@ -209,7 +211,10 @@ func (e *Engine) revoked(msg string) {
 // process uploads one queued file.
 func (e *Engine) process(at *activeTransfer) {
 	it := at.item
-	ctx := e.ctx
+	ctx := at.ctx
+	if ctx == nil {
+		ctx = e.ctx
+	}
 	c := e.getClient()
 	if c == nil {
 		_ = e.st.Defer(it.ID, time.Now().UnixMilli(), "")
