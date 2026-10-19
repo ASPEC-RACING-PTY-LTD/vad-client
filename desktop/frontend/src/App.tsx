@@ -183,7 +183,7 @@ export function App() {
           {current === 'transfers' && <TransfersScreen snap={snap} />}
           {current === 'automations' && <AutomationsScreen />}
           {current === 'mode' && <ModeScreen mode={mode} />}
-          {current === 'settings' && <SettingsScreen boot={boot} onChanged={reload} />}
+          {current === 'settings' && <SettingsScreen boot={boot} snap={snap} onChanged={reload} />}
         </main>
       </div>
     </div>

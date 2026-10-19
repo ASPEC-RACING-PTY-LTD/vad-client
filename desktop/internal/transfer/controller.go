@@ -29,6 +29,9 @@ type Controller struct {
 	manual   int
 	inflight int
 	changed  chan struct{}
+	// waiting counts the Acquire calls waiting per priority; a free slot
+	// goes to the lowest priority value first.
+	waiting map[int64]int
 
 	// current window
 	winStart   time.Time
@@ -54,7 +57,7 @@ const AbsoluteMax = 128
 
 // NewController returns a controller starting at two parallel requests.
 func NewController(maxLimit int) *Controller {
-	c := &Controller{limit: 2, max: clamp(maxLimit, 1, AbsoluteMax), changed: make(chan struct{}), slowStart: true, ssthresh: AbsoluteMax, winStart: time.Now()}
+	c := &Controller{limit: 2, max: clamp(maxLimit, 1, AbsoluteMax), changed: make(chan struct{}), waiting: map[int64]int{}, slowStart: true, ssthresh: AbsoluteMax, winStart: time.Now()}
 	return c
 }
 
@@ -109,25 +112,50 @@ func (c *Controller) Throughput() float64 {
 }
 
 // Acquire blocks until a request slot is free.
-func (c *Controller) Acquire(ctx context.Context) error {
+func (c *Controller) Acquire(ctx context.Context) error { return c.AcquirePriority(ctx, 0) }
+
+// AcquirePriority blocks until a request slot is free and no request with a
+// lower priority value is waiting for one. Uploads pass their queue order,
+// so the file that started first gets the connections and finishes first
+// instead of every file sharing the bandwidth.
+func (c *Controller) AcquirePriority(ctx context.Context, prio int64) error {
+	c.mu.Lock()
+	c.waiting[prio]++
+	defer func() {
+		if c.waiting[prio]--; c.waiting[prio] <= 0 {
+			delete(c.waiting, prio)
+		}
+		c.notify() // the next waiter may now be first
+		c.mu.Unlock()
+	}()
 	for {
-		c.mu.Lock()
-		if c.inflight < c.limit {
+		if c.inflight < c.limit && c.first(prio) {
 			c.inflight++
 			if c.inflight >= c.limit && c.satSince.IsZero() {
 				c.satSince = time.Now()
 			}
-			c.mu.Unlock()
 			return nil
 		}
 		ch := c.changed
 		c.mu.Unlock()
 		select {
 		case <-ctx.Done():
+			c.mu.Lock()
 			return ctx.Err()
 		case <-ch:
 		}
+		c.mu.Lock()
 	}
+}
+
+// first reports whether no waiter has a lower priority value than prio.
+func (c *Controller) first(prio int64) bool {
+	for p := range c.waiting {
+		if p < prio {
+			return false
+		}
+	}
+	return true
 }
 
 // Release frees a slot and records the request outcome.

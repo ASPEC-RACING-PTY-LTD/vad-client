@@ -487,6 +487,9 @@ export namespace config {
 	    notifications: boolean;
 	    paused: boolean;
 	    auto_update: boolean;
+	    direct_upload: boolean;
+	    direct_url?: string;
+	    direct_reset_gen?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new Settings(source);
@@ -510,6 +513,9 @@ export namespace config {
 	        this.notifications = source["notifications"];
 	        this.paused = source["paused"];
 	        this.auto_update = source["auto_update"];
+	        this.direct_upload = source["direct_upload"];
+	        this.direct_url = source["direct_url"];
+	        this.direct_reset_gen = source["direct_reset_gen"];
 	    }
 	}
 	export class SyncConfig {
@@ -715,6 +721,24 @@ export namespace engine {
 	        this.watching = source["watching"];
 	    }
 	}
+	export class DirectView {
+	    enabled: boolean;
+	    active: boolean;
+	    url: string;
+	    message: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DirectView(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.enabled = source["enabled"];
+	        this.active = source["active"];
+	        this.url = source["url"];
+	        this.message = source["message"];
+	    }
+	}
 	export class PreviewEntry {
 	    rel_path: string;
 	    size: number;
@@ -750,6 +774,7 @@ export namespace engine {
 	    eta_seconds: number;
 	    session_completed: number;
 	    session_bytes: number;
+	    last_failed_at: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new Stats(source);
@@ -767,6 +792,7 @@ export namespace engine {
 	        this.eta_seconds = source["eta_seconds"];
 	        this.session_completed = source["session_completed"];
 	        this.session_bytes = source["session_bytes"];
+	        this.last_failed_at = source["last_failed_at"];
 	    }
 	}
 	export class Snapshot {
@@ -777,6 +803,7 @@ export namespace engine {
 	    stats: Stats;
 	    active: ActiveView[];
 	    automations: number;
+	    direct: DirectView;
 	
 	    static createFrom(source: any = {}) {
 	        return new Snapshot(source);
@@ -791,6 +818,7 @@ export namespace engine {
 	        this.stats = this.convertValues(source["stats"], Stats);
 	        this.active = this.convertValues(source["active"], ActiveView);
 	        this.automations = source["automations"];
+	        this.direct = this.convertValues(source["direct"], DirectView);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

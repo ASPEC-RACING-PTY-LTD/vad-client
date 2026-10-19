@@ -221,6 +221,16 @@ type Settings struct {
 	Paused          bool   `json:"paused"`
 	// AutoUpdate installs new releases automatically when sync is idle.
 	AutoUpdate bool `json:"auto_update"`
+	// DirectUpload sends sync and backup uploads to the server's local
+	// address DirectURL instead of the public URL (off by default). It is
+	// used only while the address is verified to reach the same server, so a
+	// device away from that network uses the public URL.
+	DirectUpload bool   `json:"direct_upload"`
+	DirectURL    string `json:"direct_url,omitempty"`
+	// DirectResetGen is the server's reset generation when direct uploads
+	// were turned on (-1: take it from the next check). An administrator's
+	// reset raises the server's value, which turns DirectUpload off.
+	DirectResetGen int64 `json:"direct_reset_gen,omitempty"`
 }
 
 func DefaultSettings() Settings {

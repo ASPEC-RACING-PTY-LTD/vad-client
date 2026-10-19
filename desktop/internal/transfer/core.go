@@ -23,7 +23,9 @@ import (
 
 const (
 	// MaxChunkParallelPerFile bounds the parallel chunk requests of one file.
-	MaxChunkParallelPerFile = 4
+	// With priorities the first file can use this many connections before
+	// the next file gets any.
+	MaxChunkParallelPerFile = 8
 	// chunkAttempts is how often one chunk is tried within an upload.
 	chunkAttempts = 5
 )
@@ -47,6 +49,11 @@ type Progress struct {
 	// (upload.zstd). A server without support is detected on the first
 	// refused chunk and the rest go raw.
 	Compress bool
+	// Priority orders this upload's chunk requests against other uploads:
+	// lower values get free connections first (the queue order).
+	Priority int64
+	// Session, if set, receives the server's upload session id.
+	Session func(id string)
 }
 
 func (p Progress) phase(s string) {
@@ -151,10 +158,13 @@ func (c *Core) Upload(ctx context.Context, cl *client.Client, req client.UploadR
 		return res, nil
 	}
 	up := res.Upload
+	if p.Session != nil {
+		p.Session(up.ID)
+	}
 	if p.Sent != nil {
 		p.Sent.Store(up.BytesReceived)
 	}
-	if err := c.uploadChunks(ctx, cl, up, r, p.Sent, p.Compress); err != nil {
+	if err := c.uploadChunks(ctx, cl, up, r, p.Sent, p.Compress, p.Priority); err != nil {
 		return nil, &StageError{Stage: "upload", Err: err}
 	}
 	p.phase("finalizing")
@@ -169,10 +179,10 @@ func (c *Core) Upload(ctx context.Context, cl *client.Client, req client.UploadR
 // with bounded per-file parallelism under the global adaptive concurrency.
 // sent (optional) receives byte progress.
 func (c *Core) UploadChunks(ctx context.Context, cl *client.Client, up *client.UploadSession, r io.ReaderAt, sent *atomic.Int64) error {
-	return c.uploadChunks(ctx, cl, up, r, sent, false)
+	return c.uploadChunks(ctx, cl, up, r, sent, false, 0)
 }
 
-func (c *Core) uploadChunks(ctx context.Context, cl *client.Client, up *client.UploadSession, r io.ReaderAt, sent *atomic.Int64, compress bool) error {
+func (c *Core) uploadChunks(ctx context.Context, cl *client.Client, up *client.UploadSession, r io.ReaderAt, sent *atomic.Int64, compress bool, prio int64) error {
 	missing := up.Missing()
 	if len(missing) == 0 {
 		return nil
@@ -200,7 +210,7 @@ func (c *Core) uploadChunks(ctx context.Context, cl *client.Client, up *client.U
 				if ctx.Err() != nil {
 					return
 				}
-				if err := c.sendChunk(ctx, cl, up, r, idx, sent, compress); err != nil {
+				if err := c.sendChunk(ctx, cl, up, r, idx, sent, compress, prio); err != nil {
 					errOnce.Do(func() { firstErr = err })
 					cancel()
 					return
@@ -228,14 +238,14 @@ func (p progressReaderAt) ReadAt(b []byte, off int64) (int, error) {
 	return n, err
 }
 
-func (c *Core) sendChunk(ctx context.Context, cl *client.Client, up *client.UploadSession, r io.ReaderAt, idx int64, sent *atomic.Int64, compress bool) error {
+func (c *Core) sendChunk(ctx context.Context, cl *client.Client, up *client.UploadSession, r io.ReaderAt, idx int64, sent *atomic.Int64, compress bool, prio int64) error {
 	off, n := idx*up.ChunkSize, up.ChunkLen(idx)
 	sum, err := client.HashSection(r, off, n)
 	if err != nil {
 		return err
 	}
 	for attempt := 0; ; attempt++ {
-		if err := c.ctrl.Acquire(ctx); err != nil {
+		if err := c.ctrl.AcquirePriority(ctx, prio); err != nil {
 			return err
 		}
 		var local atomic.Int64

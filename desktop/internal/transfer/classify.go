@@ -2,6 +2,7 @@ package transfer
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"math/rand/v2"
 	"net"
@@ -11,8 +12,35 @@ import (
 )
 
 // MaxAttempts is the number of times a queued transfer is tried before it is
-// marked as failed.
-const MaxAttempts = 12
+// marked as failed: two failures are tolerated (a dropped connection, a
+// proxy timeout), the third is reported with its reason.
+const MaxAttempts = 3
+
+// FailReason explains in plain words why a transfer failed after attempts
+// tries.
+func FailReason(err error, attempts int) string {
+	var ae *client.APIError
+	var ne net.Error
+	why := err.Error()
+	switch {
+	case errors.As(err, &ae) && ae.Status == 524:
+		why = "the server took longer than Cloudflare's 100-second limit to answer"
+	case errors.As(err, &ae) && (ae.Status == 502 || ae.Status == 504 || (ae.Status >= 520 && ae.Status <= 527)):
+		why = fmt.Sprintf("the proxy in front of the server gave up on the request (HTTP %d)", ae.Status)
+	case errors.As(err, &ae) && ae.Status == 503:
+		why = "the server was too busy"
+	case errors.As(err, &ae) && ae.Message != "":
+		why = ae.Message
+	case errors.As(err, &ne) && ne.Timeout():
+		why = "the connection to the server timed out"
+	case IsNetErr(err):
+		why = "the connection to the server dropped"
+	}
+	if attempts <= 1 {
+		return why
+	}
+	return fmt.Sprintf("%s (failed %d times)", why, attempts)
+}
 
 // Backoff returns the wait before retry number attempts: exponential from
 // 5s, capped at 30 minutes, plus up to 20% jitter.

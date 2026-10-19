@@ -44,6 +44,7 @@ type activeTransfer struct {
 	speed    float64
 	lastSent int64
 	lastT    time.Time
+	uploadID atomic.Value // string: the server's upload session, once opened
 }
 
 type runStats struct {
@@ -65,6 +66,8 @@ type Engine struct {
 
 	mu           sync.Mutex
 	client       *client.Client
+	features     map[string]bool // the server's feature flags
+	direct       DirectView
 	deviceName   string
 	configs      map[string]*config.SyncConfig
 	filters      map[string]*filter.Filter
@@ -197,6 +200,12 @@ func (e *Engine) Stop() {
 func (e *Engine) SetClient(c *client.Client, me *client.Me) {
 	e.mu.Lock()
 	e.client = c
+	e.features = map[string]bool{}
+	if me != nil {
+		for _, f := range me.Features {
+			e.features[f] = true
+		}
+	}
 	if c != nil {
 		serverMax := 0
 		if me != nil {
@@ -238,6 +247,13 @@ func (e *Engine) kick() {
 	case e.wake <- struct{}{}:
 	default:
 	}
+}
+
+// serverHas reports whether the connected server advertises feature f.
+func (e *Engine) serverHas(f string) bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.features[f]
 }
 
 func (e *Engine) getClient() *client.Client {
@@ -387,9 +403,13 @@ func commonDir(files []string) string {
 // transfers in progress: they go back to the queue and start again (resuming
 // the server-side upload session) when synchronisation is resumed.
 func (e *Engine) SetPaused(p bool) {
+	if !p && e.restartIfRouteChanged() {
+		return // unpaused once the interrupted sessions are wiped
+	}
 	e.mu.Lock()
 	e.paused = p
 	if p {
+		e.recordPausedUploads()
 		for _, at := range e.active {
 			if at.cancel != nil {
 				at.cancel()
@@ -464,6 +484,9 @@ type Stats struct {
 	ETASeconds       float64 `json:"eta_seconds"`
 	SessionCompleted int     `json:"session_completed"`
 	SessionBytes     int64   `json:"session_bytes"`
+	// LastFailedAt (unix ms) lets the UI hide a dismissed failure warning
+	// until a newer failure.
+	LastFailedAt int64 `json:"last_failed_at"`
 }
 
 type Snapshot struct {
@@ -474,13 +497,33 @@ type Snapshot struct {
 	Stats       Stats        `json:"stats"`
 	Active      []ActiveView `json:"active"`
 	Automations int          `json:"automations"`
+	Direct      DirectView   `json:"direct"`
+}
+
+// DirectView is the state of direct (LAN) uploads for the UI.
+type DirectView struct {
+	Enabled bool   `json:"enabled"`
+	Active  bool   `json:"active"` // uploads go to the local address now
+	URL     string `json:"url"`
+	Message string `json:"message"`
+}
+
+// SetDirect records the state of direct uploads (set by the agent host).
+func (e *Engine) SetDirect(v DirectView) {
+	e.mu.Lock()
+	e.direct = v
+	e.mu.Unlock()
 }
 
 func (e *Engine) Snapshot() Snapshot {
 	pending, failed, pendingBytes := e.st.QueueStats()
+	var lastFailed int64
+	if failed > 0 {
+		lastFailed = e.st.LastFailedAt()
+	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	s := Snapshot{Status: e.status, Message: e.message, Paused: e.paused, Connected: e.client != nil, Automations: len(e.autos)}
+	s := Snapshot{Status: e.status, Message: e.message, Paused: e.paused, Connected: e.client != nil, Automations: len(e.autos), Direct: e.direct}
 	var speed float64
 	var sentActive int64
 	for _, a := range e.active {
@@ -502,7 +545,7 @@ func (e *Engine) Snapshot() Snapshot {
 	if s.Active == nil {
 		s.Active = []ActiveView{}
 	}
-	s.Stats = Stats{Active: len(e.active), Queued: pending, Failed: failed, PendingBytes: pendingBytes, SpeedBps: speed, Concurrency: e.ctrl.Inflight(), ConcurrencyLimit: e.ctrl.Limit(), SessionCompleted: e.session.completed, SessionBytes: e.session.bytes}
+	s.Stats = Stats{Active: len(e.active), Queued: pending, Failed: failed, LastFailedAt: lastFailed, PendingBytes: pendingBytes, SpeedBps: speed, Concurrency: e.ctrl.Inflight(), ConcurrencyLimit: e.ctrl.Limit(), SessionCompleted: e.session.completed, SessionBytes: e.session.bytes}
 	if speed > 1024 {
 		s.Stats.ETASeconds = float64(max(0, pendingBytes-sentActive)) / speed
 	}

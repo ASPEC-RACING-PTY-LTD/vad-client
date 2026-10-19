@@ -407,6 +407,14 @@ func (s *Store) QueueStats() (pending, failed int64, pendingBytes int64) {
 	return
 }
 
+// LastFailedAt returns when the most recent queue item failed (unix ms), or
+// 0 without failures.
+func (s *Store) LastFailedAt() int64 {
+	var t int64
+	_ = s.DB.QueryRow("SELECT COALESCE(MAX(updated_at),0) FROM queue WHERE status = 'failed'").Scan(&t)
+	return t
+}
+
 // PendingForConfig counts unfinished items of a configuration.
 func (s *Store) PendingForConfig(configID string) int64 {
 	var n int64

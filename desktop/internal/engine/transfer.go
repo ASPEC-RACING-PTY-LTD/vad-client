@@ -10,6 +10,7 @@ import (
 	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/state"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/transfer"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/client"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
 
 func (e *Engine) dispatchLoop() {
@@ -147,16 +148,30 @@ func (e *Engine) handleErr(at *activeTransfer, err error, stage string) {
 		_ = e.st.Defer(it.ID, time.Now().UnixMilli(), "")
 		e.revoked(ae.Message)
 		return
+	case client.IsDirectLost(err):
+		// The local address went away: the route is dropped, so the next
+		// try goes to the public URL. Not the file's fault.
+		_ = e.st.Defer(it.ID, time.Now().UnixMilli(), "server's local address unreachable; using the public address")
+		return
 	case transfer.IsNetErr(err) && !errors.As(err, &ae):
 		e.mu.Lock()
 		e.netFailures++
-		if e.netFailures >= 3 {
+		offline := e.netFailures >= 3
+		if offline {
 			e.offlineUntil = time.Now().Add(min(time.Duration(e.netFailures)*10*time.Second, 5*time.Minute))
 		}
 		e.mu.Unlock()
-		_ = e.st.Retry(it.ID, time.Now().Add(transfer.Backoff(min(it.Attempts, 4))).UnixMilli(), msg)
 		e.log.Warn("network error", "file", it.RelPath, "err", err)
-		return
+		if offline {
+			// The server is unreachable, not this file: wait without
+			// counting an attempt.
+			_ = e.st.Defer(it.ID, time.Now().Add(transfer.Backoff(min(it.Attempts, 4))).UnixMilli(), "server unreachable; waiting")
+			return
+		}
+		if it.Attempts+1 < transfer.MaxAttempts {
+			_ = e.st.Retry(it.ID, time.Now().Add(transfer.Backoff(it.Attempts)).UnixMilli(), msg)
+			return
+		}
 	case errors.As(err, &ae) && ae.Status == 507:
 		_ = e.st.Retry(it.ID, time.Now().Add(15*time.Minute).UnixMilli(), "server is low on disk space; retrying later")
 		return
@@ -169,9 +184,7 @@ func (e *Engine) handleErr(at *activeTransfer, err error, stage string) {
 		e.log.Warn("transfer failed, will retry", "file", it.RelPath, "attempt", it.Attempts+1, "err", err)
 		return
 	}
-	if errors.As(err, &ae) && ae.Message != "" {
-		msg = ae.Message
-	}
+	msg = transfer.FailReason(err, it.Attempts+1)
 	_ = e.st.Fail(it.ID, msg)
 	_ = e.st.PutFile(state.FileEntry{ConfigID: it.ConfigID, RelPath: it.RelPath, Size: it.Size, MTime: it.MTime, Status: "failed", Reason: msg})
 	e.st.AddHistory(state.HistoryEntry{ConfigID: it.ConfigID, RelPath: it.RelPath, RemotePath: it.RemotePath(), Size: it.Size, Status: "failed", Error: msg, DurationMS: time.Since(at.started).Milliseconds()})
@@ -297,7 +310,13 @@ func (e *Engine) process(at *activeTransfer) {
 		return
 	}
 
-	res, err := e.xfer.Upload(ctx, c, client.UploadRequest{Path: it.RemotePath(), Size: size, SHA256: sum, ModifiedAt: fi.ModTime().UnixMilli(), Tags: it.Tags, OnConflict: cfg.OnConflict}, f, transfer.Progress{Sent: &at.sent, Phase: func(p string) { at.phase.Store(p) }, Compress: cfg.Compress})
+	req := client.UploadRequest{Path: it.RemotePath(), Size: size, SHA256: sum, ModifiedAt: fi.ModTime().UnixMilli(), Tags: it.Tags, OnConflict: cfg.OnConflict}
+	// The server keeps compressed chunks as they are and does not compress
+	// the raw ones again (they did not shrink here).
+	req.Compressed = cfg.Compress && e.serverHas(wire.FeatureUploadCompressedFlag)
+	// Queue order is the priority: the file that started first gets the
+	// connections and finishes first.
+	res, err := e.xfer.Upload(ctx, c, req, f, transfer.Progress{Sent: &at.sent, Phase: func(p string) { at.phase.Store(p) }, Compress: cfg.Compress, Priority: it.ID, Session: func(id string) { at.uploadID.Store(id) }})
 	if err != nil {
 		var se *transfer.StageError
 		if !errors.As(err, &se) {
@@ -311,8 +330,12 @@ func (e *Engine) process(at *activeTransfer) {
 				_ = e.st.Defer(it.ID, time.Now().Add(stable).UnixMilli(), "file changed during upload; will upload the new version")
 				return
 			case client.IsCode(se.Err, "not_found") || client.IsCode(se.Err, "upload_gone"):
-				_ = e.st.Defer(it.ID, time.Now().UnixMilli(), "upload session expired; restarting")
-				return
+				// Restarting counts as a try, so a file that keeps losing its
+				// session fails with a reason instead of looping.
+				if it.Attempts+1 < transfer.MaxAttempts {
+					_ = e.st.Retry(it.ID, time.Now().UnixMilli(), "upload session expired; restarting")
+					return
+				}
 			}
 		}
 		e.handleErr(at, se.Err, se.Stage)

@@ -133,6 +133,8 @@ func (e *Engine) reportState() {
 			"concurrency": snap.Stats.Concurrency, "concurrency_limit": snap.Stats.ConcurrencyLimit, "eta_seconds": snap.Stats.ETASeconds,
 		},
 		"active": active,
+		// Shown in the admin panel, which can turn direct uploads off.
+		"direct_upload": map[string]any{"enabled": snap.Direct.Enabled, "active": snap.Direct.Active, "url": snap.Direct.URL},
 	}
 	ctx, cancel := context.WithTimeout(e.ctx, 20*time.Second)
 	defer cancel()

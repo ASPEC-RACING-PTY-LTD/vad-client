@@ -165,6 +165,8 @@ type Host struct {
 	ctx    context.Context // cancelled by Close
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
+
+	directKick chan struct{} // re-checks the direct upload route (host_direct.go)
 }
 
 type enrollment struct {
@@ -222,7 +224,7 @@ func NewHost(opts Options) (*Host, error) {
 	if err := os.MkdirAll(opts.DataDir, 0o700); err != nil {
 		return nil, err
 	}
-	h := &Host{opts: opts, bus: NewBus(opts.EventBuffer), settings: config.DefaultSettings()}
+	h := &Host{opts: opts, bus: NewBus(opts.EventBuffer), settings: config.DefaultSettings(), directKick: make(chan struct{}, 1)}
 	h.log = slog.New(NewLogHandler(h.bus, opts.Log.Handler(), opts.LogEventLevel))
 	h.ctx, h.cancel = context.WithCancel(context.Background())
 	if raw, err := os.ReadFile(h.path("settings.json")); err == nil {
@@ -288,6 +290,7 @@ func (h *Host) Start(ctx context.Context) error {
 	h.startBackupHost()
 	h.goLoop(h.restoreConnection)
 	h.goLoop(h.snapshotLoop)
+	h.goLoop(h.directLoop)
 	if h.opts.AutoUpdates && h.opts.UpdateRepo != "" {
 		h.goLoop(h.updateLoop)
 	}
@@ -446,6 +449,7 @@ func (h *Host) restoreConnection() {
 	h.client, h.me = c, me
 	h.mu.Unlock()
 	h.eng.SetClient(c, me)
+	h.attachDirect(c)
 	h.setConnection("connected")
 	h.kickModules()
 	h.startBackup(c)
@@ -646,6 +650,7 @@ func (h *Host) completeEnrollment(ctx context.Context, en *enrollment, deviceID 
 		_ = h.st.ResetIndex()
 	}
 	h.eng.SetClient(c, me)
+	h.attachDirect(c)
 	h.pinEnrolledIdentity(ident)
 	_ = h.bus.Publish(KindEnrollment, v)
 	h.setConnection("connected")
@@ -842,6 +847,11 @@ func (h *Host) SetPaused(ctx context.Context, paused bool) error {
 	err := h.saveSettingsLocked()
 	s := h.settings
 	h.mu.Unlock()
+	if !paused {
+		// Settle the upload route first: the engine restarts interrupted
+		// uploads when it changed while paused.
+		h.checkDirect()
+	}
 	h.eng.SetPaused(paused)
 	_ = h.bus.Publish(KindSettings, s)
 	return err
@@ -944,6 +954,12 @@ func (h *Host) SaveSettings(ctx context.Context, s config.Settings) (config.Sett
 	// Identity fields are not editable from the UI.
 	cur := h.settings
 	s.ServerURL, s.PinnedCert, s.DeviceID, s.Username, s.DeviceName, s.KeyFingerprint = cur.ServerURL, cur.PinnedCert, cur.DeviceID, cur.Username, cur.DeviceName, cur.KeyFingerprint
+	s.DirectURL = strings.TrimSpace(s.DirectURL)
+	directChanged := s.DirectUpload != cur.DirectUpload || s.DirectURL != cur.DirectURL
+	s.DirectResetGen = cur.DirectResetGen
+	if s.DirectUpload && directChanged {
+		s.DirectResetGen = -1 // turned on now: adopt the server's current value
+	}
 	s.Normalize()
 	h.settings = s
 	err := h.saveSettingsLocked()
@@ -958,6 +974,9 @@ func (h *Host) SaveSettings(ctx context.Context, s config.Settings) (config.Sett
 	}
 	h.eng.ApplySettings(s)
 	_ = h.bus.Publish(KindSettings, s)
+	if directChanged {
+		h.kickDirect()
+	}
 	return s, nil
 }
 

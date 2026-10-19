@@ -86,3 +86,38 @@ func TestManualOverride(t *testing.T) {
 		t.Fatalf("max not respected: %d", c.Limit())
 	}
 }
+
+// A free slot goes to the waiter with the lowest priority value.
+func TestAcquirePriority(t *testing.T) {
+	c := NewController(1)
+	c.SetBounds(1, 1)
+	if err := c.Acquire(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	got := make(chan int64, 2)
+	for _, p := range []int64{9, 3} {
+		go func() {
+			if c.AcquirePriority(t.Context(), p) == nil {
+				got <- p
+			}
+		}()
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		c.mu.Lock()
+		n := c.waiting[9] + c.waiting[3]
+		c.mu.Unlock()
+		if n == 2 || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(time.Millisecond)
+	}
+	c.Release(0, 0, false)
+	if p := <-got; p != 3 {
+		t.Fatalf("first slot went to priority %d, want 3", p)
+	}
+	c.Release(0, 0, false)
+	if p := <-got; p != 9 {
+		t.Fatalf("second slot went to priority %d, want 9", p)
+	}
+}

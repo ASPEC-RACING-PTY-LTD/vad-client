@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ArrowUpCircle, FileText, LogOut, RefreshCw, RotateCcw } from 'lucide-react'
 import { CheckForUpdates, Disconnect, GetSettings, GetUpdateStatus, InstallUpdate, OpenLogsFolder, OpenURL, ResetSyncData, SaveSettings } from '../../wailsjs/go/main/App'
-import type { agent, config, updater } from '../../wailsjs/go/models'
+import type { agent, config, engine, updater } from '../../wailsjs/go/models'
 import { EventsOn } from '../../wailsjs/runtime/runtime'
 import { Button, Field, PageLoader, Toggle, useUI } from '../ui'
 import { errMsg, timeAgo } from '../lib'
@@ -30,11 +30,12 @@ function UpdateLine({ u }: { u: updater.Status }) {
   }
 }
 
-export function SettingsScreen({ boot, onChanged }: { boot: agent.Bootstrap; onChanged: () => void }) {
+export function SettingsScreen({ boot, snap, onChanged }: { boot: agent.Bootstrap; snap: engine.Snapshot | null; onChanged: () => void }) {
   const [s, setS] = useState<config.Settings | null>(null)
   const [update, setUpdate] = useState<updater.Status | null>(null)
   const [checking, setChecking] = useState(false)
   const [installing, setInstalling] = useState(false)
+  const [directURL, setDirectURL] = useState<string | null>(null)
   const { toast, confirm } = useUI()
   useEffect(() => {
     GetSettings().then(setS)
@@ -82,6 +83,41 @@ export function SettingsScreen({ boot, onChanged }: { boot: agent.Bootstrap; onC
         <Field label="Upload bandwidth limit (KB/s)" hint="0 means unlimited. Leaves room for gaming and calls on slower connections.">
           <input className="input" type="number" min={0} value={s.bandwidth_kbps} onChange={(e) => save({ bandwidth_kbps: Number(e.target.value) })} />
         </Field>
+      </section>
+
+      <section className="card space-y-4 p-6">
+        <h2 className="font-semibold">Direct uploads on your local network</h2>
+        <Toggle
+          checked={s.direct_upload}
+          onChange={(v) => save({ direct_upload: v, direct_url: (directURL ?? s.direct_url ?? '').trim() })}
+          label="Upload directly to the server's local address"
+          description="For a PC on the same network as the server: sync and backup uploads skip the public address and its upload and speed limits. VaultDock checks that the address reaches this same server and uses the public address whenever it does not (for example away from home). Traffic over plain http:// is not encrypted on your network. An administrator can turn this off from the admin panel."
+        />
+        <Field label="Server's local address" hint="The server's IP and port on your network, for example 192.168.1.20:3000 (the port VaultDock is published on).">
+          <div className="flex gap-2">
+            <input
+              className="input"
+              placeholder="192.168.1.20:3000"
+              value={directURL ?? s.direct_url ?? ''}
+              onChange={(e) => setDirectURL(e.target.value)}
+            />
+            <Button
+              disabled={directURL === null || directURL.trim() === (s.direct_url ?? '')}
+              onClick={async () => {
+                await save({ direct_url: (directURL ?? '').trim() })
+                setDirectURL(null)
+              }}
+            >
+              Save
+            </Button>
+          </div>
+        </Field>
+        {s.direct_upload && snap?.direct && (
+          <p className={`text-sm ${snap.direct.active ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+            {snap.direct.message || 'Checking the local address…'}
+          </p>
+        )}
+        {!s.direct_upload && snap?.direct?.message && <p className="text-sm text-slate-500">{snap.direct.message}</p>}
       </section>
 
       <section className="card space-y-3 p-6">
