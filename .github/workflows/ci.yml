@@ -113,8 +113,10 @@ jobs:
         run: wails generate module
       - name: Fail if wailsjs changed
         shell: bash
+        # Compare content, not git status: the generator writes LF over the
+        # CRLF checkout, which status reports as modified.
         run: |
-          changes=$(git status --porcelain -- desktop/frontend/wailsjs)
+          changes=$(git diff --name-only -- desktop/frontend/wailsjs; git ls-files --others --exclude-standard -- desktop/frontend/wailsjs)
           if [ -n "$changes" ]; then
             echo "desktop/frontend/wailsjs is stale; run 'wails generate module' in desktop/ and commit:" >&2
             echo "$changes" >&2
