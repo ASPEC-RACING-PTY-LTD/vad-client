@@ -11,6 +11,8 @@ export function CancelEnrollment():Promise<void>;
 
 export function CheckForUpdates():Promise<updater.Status>;
 
+export function CloseWindow():Promise<void>;
+
 export function ConfirmRecoveryKey(arg1:string):Promise<void>;
 
 export function ConfirmServerIdentity(arg1:string):Promise<agent.KeyStatus>;
@@ -20,6 +22,8 @@ export function Connect(arg1:agent.ConnectRequest):Promise<agent.EnrollView>;
 export function DeleteConfig(arg1:string):Promise<void>;
 
 export function Disconnect():Promise<void>;
+
+export function Elevation():Promise<main.Elevation>;
 
 export function EncodeFolder(arg1:string):Promise<string>;
 
@@ -77,27 +81,21 @@ export function PreviewConfig(arg1:config.SyncConfig):Promise<agent.PreviewResul
 
 export function ProbeServer(arg1:agent.ProbeRequest):Promise<agent.ProbeResult>;
 
-export function Elevation():Promise<main.Elevation>;
-
-export function RestartAsAdmin():Promise<void>;
-
-export function CloseWindow():Promise<void>;
-
 export function Quit():Promise<void>;
 
 export function Readiness():Promise<agent.BackupReadiness>;
 
 export function RefreshAutomations():Promise<Array<engine.AutomationView>>;
 
+export function ResetSyncData():Promise<number>;
+
 export function ResolveFolder(arg1:string):Promise<string>;
 
-export function ResetSyncData():Promise<number>;
+export function RestartAsAdmin():Promise<void>;
 
 export function RetryFailed(arg1:number):Promise<number>;
 
 export function RetrySkipped(arg1:number):Promise<number>;
-
-export function SkipIssues(arg1:number,arg2:Array<number>,arg3:Array<string>):Promise<void>;
 
 export function RunBackup(arg1:number):Promise<number>;
 
@@ -110,6 +108,8 @@ export function SaveSettings(arg1:config.Settings):Promise<config.Settings>;
 export function SetPaused(arg1:boolean):Promise<void>;
 
 export function ShowWindow():Promise<void>;
+
+export function SkipIssues(arg1:number,arg2:Array<number>,arg3:Array<string>):Promise<void>;
 
 export function SuggestFolders():Promise<Record<string, string>>;
 

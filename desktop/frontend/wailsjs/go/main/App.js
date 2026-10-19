@@ -10,6 +10,10 @@ export function CheckForUpdates() {
   return window['go']['main']['App']['CheckForUpdates']();
 }
 
+export function CloseWindow() {
+  return window['go']['main']['App']['CloseWindow']();
+}
+
 export function ConfirmRecoveryKey(arg1) {
   return window['go']['main']['App']['ConfirmRecoveryKey'](arg1);
 }
@@ -28,6 +32,10 @@ export function DeleteConfig(arg1) {
 
 export function Disconnect() {
   return window['go']['main']['App']['Disconnect']();
+}
+
+export function Elevation() {
+  return window['go']['main']['App']['Elevation']();
 }
 
 export function EncodeFolder(arg1) {
@@ -142,18 +150,6 @@ export function ProbeServer(arg1) {
   return window['go']['main']['App']['ProbeServer'](arg1);
 }
 
-export function Elevation() {
-  return window['go']['main']['App']['Elevation']();
-}
-
-export function RestartAsAdmin() {
-  return window['go']['main']['App']['RestartAsAdmin']();
-}
-
-export function CloseWindow() {
-  return window['go']['main']['App']['CloseWindow']();
-}
-
 export function Quit() {
   return window['go']['main']['App']['Quit']();
 }
@@ -166,12 +162,16 @@ export function RefreshAutomations() {
   return window['go']['main']['App']['RefreshAutomations']();
 }
 
+export function ResetSyncData() {
+  return window['go']['main']['App']['ResetSyncData']();
+}
+
 export function ResolveFolder(arg1) {
   return window['go']['main']['App']['ResolveFolder'](arg1);
 }
 
-export function ResetSyncData() {
-  return window['go']['main']['App']['ResetSyncData']();
+export function RestartAsAdmin() {
+  return window['go']['main']['App']['RestartAsAdmin']();
 }
 
 export function RetryFailed(arg1) {
@@ -180,10 +180,6 @@ export function RetryFailed(arg1) {
 
 export function RetrySkipped(arg1) {
   return window['go']['main']['App']['RetrySkipped'](arg1);
-}
-
-export function SkipIssues(arg1, arg2, arg3) {
-  return window['go']['main']['App']['SkipIssues'](arg1, arg2, arg3);
 }
 
 export function RunBackup(arg1) {
@@ -208,6 +204,10 @@ export function SetPaused(arg1) {
 
 export function ShowWindow() {
   return window['go']['main']['App']['ShowWindow']();
+}
+
+export function SkipIssues(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SkipIssues'](arg1, arg2, arg3);
 }
 
 export function SuggestFolders() {

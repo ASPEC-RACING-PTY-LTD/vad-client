@@ -120,9 +120,15 @@ func TestShortNames(t *testing.T) {
 	if err := g.Check(OpWrite, filepath.Join(short, "f.txt"), alice); !errors.Is(err, ErrOutsideProfile) {
 		t.Fatalf("write via short name %s = %v, want ErrOutsideProfile", short, err)
 	}
+	// The temp directory itself may be given in 8.3 form (CI runners).
+	n, err = windows.GetLongPathName(p, &buf[0], uint32(len(buf)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(windows.UTF16ToString(buf[:n]), "new.txt")
 	got, err := Canonicalize(filepath.Join(short, "new.txt"))
-	if err != nil || !strings.EqualFold(got, filepath.Join(long, "new.txt")) {
-		t.Fatalf("Canonicalize(short) = %q, %v; want %q", got, err, filepath.Join(long, "new.txt"))
+	if err != nil || !strings.EqualFold(got, want) {
+		t.Fatalf("Canonicalize(short) = %q, %v; want %q", got, err, want)
 	}
 }
 

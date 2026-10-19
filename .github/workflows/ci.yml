@@ -124,14 +124,13 @@ jobs:
 
   # End-to-end tests of the desktop engine against a real vad-server. The
   # test module (desktop/e2e) resolves vad-server at ../../../vad-server, so
-  # both repositories are checked out side by side under the workspace.
-  # Allowed to fail until ASPEC-RACING-PTY-LTD/vad-server is published on
-  # GitHub (the checkout fails until then); remove continue-on-error after.
+  # both repositories are checked out side by side under the workspace. It
+  # runs on Windows: the backup and restore paths go through the Windows-only
+  # system-file guard, which refuses non-Windows paths.
   e2e:
     name: E2E (desktop engine vs vad-server)
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     timeout-minutes: 20
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v5
         with:
@@ -172,6 +171,9 @@ jobs:
           (cd sdk && go mod download)
           (cd desktop && go mod download)
           (cd desktop/frontend && npm ci --no-audit --no-fund)
+      # desktop/main.go embeds frontend/dist; go list only needs it to exist.
+      - name: Placeholder frontend/dist
+        run: mkdir -p desktop/frontend/dist && touch desktop/frontend/dist/.keep
       # Gate on the allowlist, then fail if THIRD_PARTY_NOTICES.md is stale.
       - name: Licence check
         run: bash .licenses/check.sh && bash .licenses/check.sh --notices

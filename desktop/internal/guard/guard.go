@@ -116,7 +116,7 @@ type Guard struct {
 	env       Env
 	protected []string // canonical roots denied for mutation
 	readDeny  []string // canonical roots denied for every op
-	profiles  string   // canonical ProfilesDir, or ""
+	profiles  []string // canonical ProfilesDir, or none
 }
 
 // rootNamesAlways are volume-root entries refused for every operation.
@@ -154,19 +154,24 @@ var profileNamesProtected = map[string]bool{
 	"all users":    true,
 }
 
-// New builds a Guard. Env paths must be absolute; they are canonicalised
-// lexically (no file-system access).
+// New builds a Guard. Env paths must be absolute. Each is kept in its
+// lexical form and, when it differs, with 8.3 names expanded, so a checked
+// path matches whichever form it is in.
 func New(env Env) (*Guard, error) {
 	g := &Guard{env: env}
-	canon := func(name, p string) (string, error) {
+	canon := func(name, p string) ([]string, error) {
 		if p == "" {
-			return "", nil
+			return nil, nil
 		}
 		c, err := lexical(p)
 		if err != nil {
-			return "", fmt.Errorf("guard: env %s: %w", name, err)
+			return nil, fmt.Errorf("guard: env %s: %w", name, err)
 		}
-		return c.String(), nil
+		out := []string{c.String()}
+		if long := resolveLong(c).String(); !strings.EqualFold(long, out[0]) {
+			out = append(out, long)
+		}
+		return out, nil
 	}
 	for _, f := range []struct{ name, val string }{
 		{"WinDir", env.WinDir},
@@ -179,11 +184,10 @@ func New(env Env) (*Guard, error) {
 		if err != nil {
 			return nil, err
 		}
-		if c != "" {
-			g.protected = append(g.protected, c)
-		}
+		g.protected = append(g.protected, c...)
 	}
-	if pd, _ := canon("ProgramData", env.ProgramData); pd != "" {
+	pds, _ := canon("ProgramData", env.ProgramData)
+	for _, pd := range pds {
 		g.readDeny = append(g.readDeny, pd+`\Microsoft`, pd+`\VaultDock`)
 	}
 	var err error
@@ -325,8 +329,11 @@ func (g *Guard) checkPath(op Op, c cpath, roots []cpath) (reason string, err err
 		}
 	}
 
-	if g.profiles != "" && under(s, g.profiles) {
-		pc, _ := lexical(g.profiles)
+	for _, prof := range g.profiles {
+		if !under(s, prof) {
+			continue
+		}
+		pc, _ := lexical(prof)
 		if len(c.comps) == len(pc.comps) {
 			if mut {
 				return "profiles directory", ErrProtected
