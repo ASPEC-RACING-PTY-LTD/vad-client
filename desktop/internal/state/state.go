@@ -286,7 +286,7 @@ func (s *Store) ClaimReady(n int, exclude map[string]bool) ([]Item, error) {
 		return nil, err
 	}
 	defer tx.Rollback()
-	rows, err := tx.Query("SELECT "+itemCols+" FROM queue WHERE status = 'pending' AND next_at <= ? ORDER BY next_at, id LIMIT ?", now(), n+len(exclude))
+	rows, err := tx.Query("SELECT "+itemCols+" FROM queue WHERE status = 'pending' AND next_at <= ? ORDER BY id LIMIT ?", now(), n+len(exclude))
 	if err != nil {
 		return nil, err
 	}

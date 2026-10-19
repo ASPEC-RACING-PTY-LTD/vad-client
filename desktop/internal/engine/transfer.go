@@ -63,8 +63,10 @@ func (e *Engine) dispatch() {
 	case offline:
 		return
 	}
-	// Allow a couple of extra files in flight so hashing overlaps uploads.
-	capacity := min(e.ctrl.Limit()+2, absoluteMax) - activeN
+	// At most as many files as the transfer limit are in flight, so the
+	// first files in the queue get the connections instead of every file
+	// trickling along at once.
+	capacity := min(e.ctrl.Limit(), absoluteMax) - activeN
 	if capacity <= 0 {
 		return
 	}

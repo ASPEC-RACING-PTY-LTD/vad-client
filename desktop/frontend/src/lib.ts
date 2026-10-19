@@ -1,6 +1,6 @@
 export function formatBytes(n: number | undefined | null, digits = 1): string {
   if (n === undefined || n === null || isNaN(n)) return '-'
-  if (n < 1024) return `${n} B`
+  if (n < 1024) return `${Math.round(n)} B`
   const units = ['KB', 'MB', 'GB', 'TB']
   let v = n
   let i = -1
