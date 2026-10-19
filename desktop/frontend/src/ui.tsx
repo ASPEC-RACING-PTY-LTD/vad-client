@@ -115,7 +115,7 @@ export function ProgressBar({ value, tone = 'brand', className, indeterminate }:
       aria-valuenow={indeterminate ? undefined : Math.round(Math.max(0, Math.min(100, value)))}
       className={cx('h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800', className)}
     >
-      {indeterminate ? <div className={cx('h-full w-1/3 rounded-full animate-indeterminate', tones[tone])} /> : <div className={cx('h-full rounded-full transition-all duration-300', tones[tone])} style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />}
+      {indeterminate ? <div key="indeterminate" className={cx('h-full w-1/3 rounded-full animate-indeterminate', tones[tone])} /> : <div key="value" className={cx('h-full rounded-full transition-[width] duration-300', tones[tone])} style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />}
     </div>
   )
 }
@@ -204,7 +204,7 @@ export function Tabs<T extends string>({ value, onChange, tabs }: { value: T; on
   )
 }
 
-export function Stat({ label, value, sub, icon, tone = 'brand' }: { label: string; value: ReactNode; sub?: ReactNode; icon: ReactNode; tone?: 'brand' | 'green' | 'amber' | 'red' | 'sky' }) {
+export function Stat({ label, value, sub, icon, tone = 'brand', compact }: { label: string; value: ReactNode; sub?: ReactNode; icon: ReactNode; tone?: 'brand' | 'green' | 'amber' | 'red' | 'sky'; compact?: boolean }) {
   const tones = {
     brand: 'bg-brand-100 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300',
     green: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
@@ -213,11 +213,11 @@ export function Stat({ label, value, sub, icon, tone = 'brand' }: { label: strin
     sky: 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300',
   }
   return (
-    <div className="card flex items-center gap-4 p-5">
-      <div className={cx('flex size-11 shrink-0 items-center justify-center rounded-xl', tones[tone])}>{icon}</div>
+    <div className={cx('card flex items-center', compact ? 'gap-3 p-3.5' : 'gap-4 p-5')}>
+      <div className={cx('flex shrink-0 items-center justify-center rounded-xl', compact ? 'size-9' : 'size-11', tones[tone])}>{icon}</div>
       <div className="min-w-0">
-        <div className="text-xs font-medium tracking-wide text-slate-500 uppercase dark:text-slate-400">{label}</div>
-        <div className="truncate text-xl font-semibold text-slate-900 dark:text-white">{value}</div>
+        <div className={cx('font-medium tracking-wide text-slate-500 uppercase dark:text-slate-400', compact ? 'text-[11px]' : 'text-xs')}>{label}</div>
+        <div className={cx('truncate font-semibold text-slate-900 tabular-nums dark:text-white', compact ? 'text-lg leading-6' : 'text-xl')}>{value}</div>
         {sub && <div className="truncate text-xs text-slate-500 dark:text-slate-400">{sub}</div>}
       </div>
     </div>

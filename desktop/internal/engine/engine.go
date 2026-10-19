@@ -36,7 +36,7 @@ type activeTransfer struct {
 	item     state.Item
 	ctx      context.Context
 	cancel   context.CancelFunc // pause stops the transfer; the item is requeued
-	phase    atomic.Value // string
+	phase    atomic.Value       // string
 	sent     atomic.Int64
 	size     int64
 	started  time.Time
@@ -496,7 +496,9 @@ func (e *Engine) Snapshot() Snapshot {
 		}
 		s.Active = append(s.Active, ActiveView{ID: a.item.ID, ConfigID: a.item.ConfigID, Config: cfg, Path: a.item.RelPath, Remote: a.item.RemotePath(), Size: a.size, Sent: a.sent.Load(), Speed: sp, Phase: ph, Started: a.started.UnixMilli(), Attempts: a.item.Attempts})
 	}
-	sort.Slice(s.Active, func(i, j int) bool { return s.Active[i].Started < s.Active[j].Started })
+	// Queue order (the order files are claimed in), so a row keeps its place
+	// when its transfer is retried instead of jumping to the end.
+	sort.Slice(s.Active, func(i, j int) bool { return s.Active[i].ID < s.Active[j].ID })
 	if s.Active == nil {
 		s.Active = []ActiveView{}
 	}

@@ -31,11 +31,12 @@ func IsNetErr(err error) bool {
 }
 
 // IsCongestion reports whether err indicates an overloaded link or server
-// (HTTP 429/502/503/504 or a timeout); the controller backs off on these.
+// (HTTP 429/502/503/504, a proxy timeout such as Cloudflare's 524, or a
+// timeout); the controller backs off on these.
 func IsCongestion(err error) bool {
 	var ae *client.APIError
 	if errors.As(err, &ae) {
-		return ae.Status == 429 || ae.Status == 503 || ae.Status == 502 || ae.Status == 504
+		return ae.Status == 429 || ae.Status == 503 || ae.Status == 502 || ae.Status == 504 || ae.Status == 524
 	}
 	var ne net.Error
 	return errors.As(err, &ne) && ne.Timeout()
