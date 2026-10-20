@@ -68,7 +68,7 @@ export function IssuesScreen({ jobID, onJob }: { jobID: number; onJob: (id: numb
     <div className="mx-auto max-w-5xl">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Skipped files</h1>
+          <h2 className="text-lg font-semibold tracking-tight">Skipped files</h2>
           <p className="text-sm text-slate-500">Files the latest backup could not read. They are tried again on the next run, or now with Retry.</p>
         </div>
         <select className="input w-56" aria-label="Backup" value={jobID} onChange={(e) => onJob(Number(e.target.value))}>

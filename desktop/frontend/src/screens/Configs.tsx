@@ -420,7 +420,7 @@ export function ConfigsScreen() {
     <div className="mx-auto max-w-5xl">
       <div className="mb-6 flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Sync folders</h1>
+          <h2 className="text-lg font-semibold tracking-tight">Folders & files</h2>
           <p className="text-sm text-slate-500">One-way synchronisation from this PC to VaultDock. Deleting a local file never deletes its copy in VaultDock.</p>
         </div>
         <Button variant="primary" icon={<FolderPlus className="size-4" />} onClick={() => setEditing(blank())}>

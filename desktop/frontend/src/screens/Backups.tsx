@@ -73,7 +73,7 @@ export function BackupsScreen({ goIssues }: { goIssues: (jobID: number) => void 
     <div className="mx-auto max-w-5xl">
       <div className="mb-6 flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Backups</h1>
+          <h2 className="text-lg font-semibold tracking-tight">Backups</h2>
           <p className="text-sm text-slate-500">Your folders are backed up automatically on their schedule.</p>
         </div>
         <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => setEdit(newDraft())}>

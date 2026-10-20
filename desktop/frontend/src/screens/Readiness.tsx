@@ -49,7 +49,7 @@ export function ReadinessScreen({ onSetup, goto }: { onSetup: () => void; goto: 
     <div className="mx-auto max-w-5xl">
       <div className="mb-6 flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Backup status</h1>
+          <h2 className="text-lg font-semibold tracking-tight">Backup status</h2>
           <p className="text-sm text-slate-500">{r.ready ? 'This PC is backing up.' : 'Something needs attention before backups can run.'}</p>
         </div>
         {r.ready ? <Badge tone="green">Ready</Badge> : <Badge tone="red">Not ready</Badge>}

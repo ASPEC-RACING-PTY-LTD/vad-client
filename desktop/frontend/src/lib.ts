@@ -1,14 +1,21 @@
 export function formatBytes(n: number | undefined | null, digits = 1): string {
   if (n === undefined || n === null || isNaN(n)) return '-'
   if (n < 1024) return `${Math.round(n)} B`
-  const units = ['KB', 'MB', 'GB', 'TB']
+  // Binary units throughout: 1 TB is 1024 GB, never shown as "1024 GB".
+  const units = ['KB', 'MB', 'GB', 'TB', 'PB']
   let v = n
   let i = -1
   do {
     v /= 1024
     i++
   } while (v >= 1024 && i < units.length - 1)
-  return `${v.toFixed(v >= 100 ? 0 : digits)} ${units[i]}`
+  let text = v.toFixed(v >= 100 ? 0 : digits)
+  if (Number(text) >= 1024 && i < units.length - 1) {
+    v /= 1024
+    i++
+    text = v.toFixed(digits)
+  }
+  return `${text} ${units[i]}`
 }
 export const formatSpeed = (b: number) => (b > 1 ? formatBytes(b) + '/s' : '-')
 export function formatDuration(sec: number): string {
