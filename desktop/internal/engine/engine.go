@@ -24,6 +24,7 @@ import (
 	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/filter"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/outbox"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/state"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/sysload"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/transfer"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/automation"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/client"
@@ -53,6 +54,8 @@ type runStats struct {
 	bytes    int64
 	firstErr string
 	touched  bool
+	bulk     bool // uploads are finished later by the server (deferred.go)
+	bulkSet  bool
 	depth    int
 }
 
@@ -96,6 +99,16 @@ type Engine struct {
 		bytes     int64
 	}
 
+	settings config.Settings // last applied (govern.go)
+	admin    bool            // the account administers the server
+	gov      transfer.Governor
+	sampler  sysload.Sampler // created by the timer loop
+	manual   atomic.Bool     // a fixed number of transfers is in force
+	held     atomic.Bool     // the computer is busy: no new file starts
+
+	checking  atomic.Bool  // a deferred-upload check is running
+	lastCheck atomic.Int64 // unix ms of the last one
+
 	wake     chan struct{}
 	ctx      context.Context
 	cancel   context.CancelFunc
@@ -106,6 +119,8 @@ type Engine struct {
 	NotifyOwner func(ownerSID, title, message, level string)
 	// OnRevoked is called when the server reports the device was revoked.
 	OnRevoked func()
+	// OnQueued, when set, is called after a changed file is queued.
+	OnQueued func()
 }
 
 type removal struct {
@@ -176,6 +191,9 @@ func (e *Engine) Stop() {
 	}
 	e.cancel()
 	e.mu.Lock()
+	if e.sampler != nil {
+		e.sampler.Close()
+	}
 	for id, w := range e.watchers {
 		w.stop()
 		delete(e.watchers, id)
@@ -201,6 +219,7 @@ func (e *Engine) SetClient(c *client.Client, me *client.Me) {
 	e.mu.Lock()
 	e.client = c
 	e.features = map[string]bool{}
+	e.admin = me != nil && me.User.Role == "admin"
 	if me != nil {
 		for _, f := range me.Features {
 			e.features[f] = true
@@ -221,6 +240,7 @@ func (e *Engine) SetClient(c *client.Client, me *client.Me) {
 		}
 	}
 	e.mu.Unlock()
+	e.applyBounds()
 	if c != nil {
 		e.refreshStatus()
 		go e.refreshAutomations()
@@ -230,16 +250,21 @@ func (e *Engine) SetClient(c *client.Client, me *client.Me) {
 
 // ApplySettings updates concurrency, bandwidth and notification settings.
 func (e *Engine) ApplySettings(s config.Settings) {
-	manual := 0
-	if s.ConcurrencyMode == "manual" {
-		manual = s.ManualParallel
-	}
-	e.xfer.ApplySettings(transfer.Settings{MaxParallel: s.MaxParallel, ManualParallel: manual, BandwidthKBps: s.BandwidthKBps})
+	e.mu.Lock()
+	e.settings = s
+	e.mu.Unlock()
+	e.applyBounds()
 	e.mu.Lock()
 	e.notify = s.Notifications
 	e.paused = s.Paused
 	e.mu.Unlock()
 	e.kick()
+}
+
+func (e *Engine) kickIf(b bool) {
+	if b {
+		e.kick()
+	}
 }
 
 func (e *Engine) kick() {
@@ -487,6 +512,11 @@ type Stats struct {
 	// LastFailedAt (unix ms) lets the UI hide a dismissed failure warning
 	// until a newer failure.
 	LastFailedAt int64 `json:"last_failed_at"`
+	// Governor is how much of the computer automatic transfers may use
+	// (nil with a fixed number of transfers).
+	Governor *transfer.GovernorState `json:"governor"`
+	// Verifying counts uploads the server finishes after a big sync.
+	Verifying int64 `json:"verifying"`
 }
 
 type Snapshot struct {
@@ -545,7 +575,7 @@ func (e *Engine) Snapshot() Snapshot {
 	if s.Active == nil {
 		s.Active = []ActiveView{}
 	}
-	s.Stats = Stats{Active: len(e.active), Queued: pending, Failed: failed, LastFailedAt: lastFailed, PendingBytes: pendingBytes, SpeedBps: speed, Concurrency: e.ctrl.Inflight(), ConcurrencyLimit: e.ctrl.Limit(), SessionCompleted: e.session.completed, SessionBytes: e.session.bytes}
+	s.Stats = Stats{Active: len(e.active), Queued: pending, Failed: failed, LastFailedAt: lastFailed, PendingBytes: pendingBytes, SpeedBps: speed, Concurrency: e.ctrl.Inflight(), ConcurrencyLimit: e.ctrl.Limit(), SessionCompleted: e.session.completed, SessionBytes: e.session.bytes, Governor: e.governorState(), Verifying: e.st.DeferredCount("")}
 	if speed > 1024 {
 		s.Stats.ETASeconds = float64(max(0, pendingBytes-sentActive)) / speed
 	}

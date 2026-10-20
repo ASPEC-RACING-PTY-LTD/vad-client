@@ -193,7 +193,7 @@ func (s *Store) ConfigCounts(configID string) (synced, pending, failed int64) {
 
 // ResetIndex clears the index and queue (used when the server changes).
 func (s *Store) ResetIndex() error {
-	_, err := s.DB.Exec("DELETE FROM files; DELETE FROM queue;")
+	_, err := s.DB.Exec("DELETE FROM files; DELETE FROM queue; DELETE FROM deferred_uploads;")
 	return err
 }
 
@@ -207,7 +207,7 @@ func (s *Store) ResetSyncIn(only []string) (int64, error) {
 	}
 	defer tx.Rollback()
 	var n int64
-	for _, table := range []string{"files", "queue", "history"} {
+	for _, table := range []string{"files", "queue", "history", "deferred_uploads"} {
 		q, args := inConfigs("DELETE FROM "+table+" WHERE 1 = 1", nil, only)
 		res, err := tx.Exec(q, args...)
 		if err != nil {
@@ -557,4 +557,81 @@ func inConfigs(q string, args []any, only []string) (string, []any) {
 		args = append(args, id)
 	}
 	return q, args
+}
+
+// --- uploads finished later by the server ---
+
+// Deferred is an upload whose finish the server runs later
+// (upload.deferred_finish): its data was sent, the outcome is not known yet.
+type Deferred struct {
+	UploadID string
+	SHA256   string
+	Item     Item // the queue item it was uploaded from
+}
+
+// AddDeferred records an upload waiting for the server.
+func (s *Store) AddDeferred(d Deferred) error {
+	item, _ := json.Marshal(d.Item)
+	_, err := s.DB.Exec(`INSERT INTO deferred_uploads(config_id, rel_path, upload_id, sha256, item, created_at) VALUES(?,?,?,?,?,?)
+		ON CONFLICT(config_id, rel_path) DO UPDATE SET upload_id = excluded.upload_id, sha256 = excluded.sha256, item = excluded.item, created_at = excluded.created_at`,
+		d.Item.ConfigID, d.Item.RelPath, d.UploadID, d.SHA256, string(item), now())
+	return err
+}
+
+// DeferredUploads returns up to limit waiting uploads, oldest first, of the
+// configurations in only (nil = all).
+func (s *Store) DeferredUploads(only []string, limit int) ([]Deferred, error) {
+	q, args := inConfigs("SELECT upload_id, sha256, item FROM deferred_uploads WHERE 1 = 1", nil, only)
+	rows, err := s.DB.Query(q+" ORDER BY created_at LIMIT ?", append(args, limit)...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Deferred
+	for rows.Next() {
+		var d Deferred
+		var item string
+		if err := rows.Scan(&d.UploadID, &d.SHA256, &item); err != nil {
+			return nil, err
+		}
+		_ = json.Unmarshal([]byte(item), &d.Item)
+		out = append(out, d)
+	}
+	return out, rows.Err()
+}
+
+// DeferredCount returns how many uploads of a configuration ("" = all) wait
+// for the server.
+func (s *Store) DeferredCount(configID string) int64 {
+	var n int64
+	if configID == "" {
+		_ = s.DB.QueryRow("SELECT COUNT(*) FROM deferred_uploads").Scan(&n)
+	} else {
+		_ = s.DB.QueryRow("SELECT COUNT(*) FROM deferred_uploads WHERE config_id = ?", configID).Scan(&n)
+	}
+	return n
+}
+
+// RemoveDeferred forgets a waiting upload.
+func (s *Store) RemoveDeferred(configID, rel string) error {
+	_, err := s.DB.Exec("DELETE FROM deferred_uploads WHERE config_id = ? AND rel_path = ?", configID, rel)
+	return err
+}
+
+// Requeue queues an item again with the given attempt count and note (an
+// upload the server did not end up storing).
+func (s *Store) Requeue(it Item, attempts int, note string) error {
+	it.NextAt = 0
+	if err := s.Enqueue(it); err != nil {
+		return err
+	}
+	_, err := s.DB.Exec("UPDATE queue SET attempts = ?, error = ? WHERE config_id = ? AND rel_path = ? AND status = 'pending'", attempts, note, it.ConfigID, it.RelPath)
+	return err
+}
+
+// PendingBytesFor returns the bytes queued for a configuration.
+func (s *Store) PendingBytesFor(configID string) int64 {
+	var n int64
+	_ = s.DB.QueryRow("SELECT COALESCE(SUM(size),0) FROM queue WHERE config_id = ? AND status IN ('pending','active')", configID).Scan(&n)
+	return n
 }

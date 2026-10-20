@@ -54,6 +54,10 @@ type Progress struct {
 	Priority int64
 	// Session, if set, receives the server's upload session id.
 	Session func(id string)
+	// FinishLater asks the server to finish the upload without waiting for
+	// it (upload.deferred_finish). The result then has Status "finalizing"
+	// unless the server was already done; the outcome is checked later.
+	FinishLater bool
 }
 
 func (p Progress) phase(s string) {
@@ -168,7 +172,11 @@ func (c *Core) Upload(ctx context.Context, cl *client.Client, req client.UploadR
 		return nil, &StageError{Stage: "upload", Err: err}
 	}
 	p.phase("finalizing")
-	res, err = cl.CompleteUpload(ctx, up.ID)
+	if p.FinishLater {
+		res, err = cl.FinishLater(ctx, up.ID)
+	} else {
+		res, err = cl.CompleteUpload(ctx, up.ID)
+	}
 	if err != nil {
 		return nil, &StageError{Stage: "complete", Err: err}
 	}

@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
@@ -63,8 +64,29 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.mu.Unlock()
 	go a.bridgeEvents()
+	go a.watchWindow()
 	if slices.Contains(os.Args[1:], "--updated") && UpdateRepo != "" && a.toasts != nil {
 		a.toasts.Show("VaultDock updated", "You are now running version "+engine.Version+".", "info")
+	}
+}
+
+// watchWindow tells the agent whether the window is open on screen, which
+// decides how often it checks for updates.
+func (a *App) watchWindow() {
+	tick := time.NewTicker(5 * time.Second)
+	defer tick.Stop()
+	known, last := false, false
+	for {
+		if v := windowOnScreen(); !known || v != last {
+			if err := a.api.SetWindowVisible(a.bg, v); err == nil {
+				known, last = true, v
+			}
+		}
+		select {
+		case <-a.bg.Done():
+			return
+		case <-tick.C:
+		}
 	}
 }
 

@@ -46,7 +46,16 @@ func (e *Engine) dispatch() {
 	c := e.client
 	paused := e.paused
 	offline := time.Now().Before(e.offlineUntil)
-	activeN := len(e.active)
+	// A file the server is finishing no longer sends anything, so it does
+	// not hold one of the transfer slots: the next file starts uploading.
+	activeN, finishing := 0, 0
+	for _, a := range e.active {
+		if a.phase.Load() == "finalizing" {
+			finishing++
+		} else {
+			activeN++
+		}
+	}
 	exclude := map[string]bool{}
 	for id, cfg := range e.configs {
 		if !cfg.Enabled {
@@ -63,11 +72,16 @@ func (e *Engine) dispatch() {
 		return
 	case offline:
 		return
+	case e.held.Load():
+		return // the computer is busy; govern wakes the dispatcher
 	}
 	// At most as many files as the transfer limit are in flight, so the
 	// first files in the queue get the connections instead of every file
 	// trickling along at once.
 	capacity := min(e.ctrl.Limit(), absoluteMax) - activeN
+	// Bound the files waiting for the server, so a slow server is not
+	// handed an unbounded backlog.
+	capacity = min(capacity, 2*absoluteMax-activeN-finishing)
 	if capacity <= 0 {
 		return
 	}
@@ -124,6 +138,8 @@ func (e *Engine) refreshStatus() {
 		e.status, e.message = "paused", "Synchronisation is paused"
 	case time.Now().Before(e.offlineUntil):
 		e.status, e.message = "offline", "Server unreachable; retrying automatically"
+	case e.held.Load() && pending > 0:
+		e.status, e.message = "waiting", "Your computer is busy; transfers continue when it has room"
 	case len(e.active) > 0 || pending > 0:
 		e.status, e.message = "syncing", fmt.Sprintf("%d file(s) remaining", pending)
 	case scanning:
@@ -316,7 +332,7 @@ func (e *Engine) process(at *activeTransfer) {
 	req.Compressed = cfg.Compress && e.serverHas(wire.FeatureUploadCompressedFlag)
 	// Queue order is the priority: the file that started first gets the
 	// connections and finishes first.
-	res, err := e.xfer.Upload(ctx, c, req, f, transfer.Progress{Sent: &at.sent, Phase: func(p string) { at.phase.Store(p) }, Compress: cfg.Compress, Priority: it.ID, Session: func(id string) { at.uploadID.Store(id) }})
+	res, err := e.xfer.Upload(ctx, c, req, f, transfer.Progress{Sent: &at.sent, Phase: func(p string) { at.phase.Store(p); e.kickIf(p == "finalizing") }, Compress: cfg.Compress, Priority: it.ID, Session: func(id string) { at.uploadID.Store(id) }, FinishLater: e.bulkRun(it.ConfigID)})
 	if err != nil {
 		var se *transfer.StageError
 		if !errors.As(err, &se) {
@@ -352,6 +368,12 @@ func (e *Engine) process(at *activeTransfer) {
 		e.session.bytes += size
 	}
 	e.mu.Unlock()
+	if id, _ := at.uploadID.Load().(string); res.Status == "finalizing" && id != "" {
+		// The server finishes it later; checked once the sync is done.
+		e.deferredSent(it, id, sum, size, mtime)
+		e.log.Info("uploaded; the server finishes it later", "file", it.RelPath, "bytes", size, "ms", time.Since(at.started).Milliseconds())
+		return
+	}
 	_ = e.st.PutFile(state.FileEntry{ConfigID: it.ConfigID, RelPath: it.RelPath, Size: size, MTime: mtime, SHA256: sum, RemotePath: it.RemotePath(), Status: "synced", UploadedAt: time.Now().UnixMilli()})
 	_ = e.st.Done(it.ID)
 	e.st.AddHistory(state.HistoryEntry{ConfigID: it.ConfigID, RelPath: it.RelPath, RemotePath: it.RemotePath(), Size: size, Status: "completed", Result: res.Result, DurationMS: time.Since(at.started).Milliseconds()})

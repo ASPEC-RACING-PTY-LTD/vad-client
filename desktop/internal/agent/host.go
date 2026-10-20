@@ -159,8 +159,12 @@ type Host struct {
 	upd            *updater.Updater
 	installPending bool
 	notifiedUpdate string
-	mods           *modules.Manager // nil before Start or when unavailable
-	bk             *backupState     // nil when Options.Backup is nil; set once in NewHost
+	// Update check schedule (updates.go).
+	windowVisible   bool
+	lastUpdateCheck time.Time
+	updateChecking  bool
+	mods            *modules.Manager // nil before Start or when unavailable
+	bk              *backupState     // nil when Options.Backup is nil; set once in NewHost
 
 	ctx    context.Context // cancelled by Close
 	cancel context.CancelFunc
@@ -292,6 +296,7 @@ func (h *Host) Start(ctx context.Context) error {
 	h.goLoop(h.snapshotLoop)
 	h.goLoop(h.directLoop)
 	if h.opts.AutoUpdates && h.opts.UpdateRepo != "" {
+		h.eng.OnQueued = func() { go h.maybeCheckUpdates("sync") }
 		h.goLoop(h.updateLoop)
 	}
 	return nil
@@ -473,7 +478,7 @@ func (h *Host) Bootstrap(ctx context.Context) (Bootstrap, error) {
 		b.Enrollment = &v
 	}
 	if h.me != nil {
-		b.ServerInfo = &ServerInfo{Version: h.me.Server.Version, SiteName: h.me.Server.SiteName, Quota: h.me.User.QuotaBytes, Used: h.me.User.UsedBytes}
+		b.ServerInfo = &ServerInfo{Version: h.me.Server.Version, SiteName: h.me.Server.SiteName, Quota: h.me.User.QuotaBytes, Used: h.me.User.UsedBytes, Admin: h.me.User.Role == "admin"}
 	}
 	return b, nil
 }

@@ -101,6 +101,7 @@ var methodAccess = map[string]Access{
 	"SetPaused":          AccessUser,
 	"CheckForUpdates":    AccessUser,
 	"InstallUpdate":      AccessUser,
+	"SetWindowVisible":   AccessUser,
 	"ConfirmRecoveryKey": AccessUser,
 	// First-run key setup: the repository and the trusted server identity
 	// are machine-wide; InitRepository returns the recovery key once.

@@ -93,6 +93,10 @@ type API interface {
 	// InstallUpdate installs a downloaded (or downloads then installs) update;
 	// the agent asks its owner to exit so the installer can run.
 	InstallUpdate(ctx context.Context) error
+	// SetWindowVisible tells the agent whether the app window is open on
+	// screen (not hidden to the tray or minimised): it checks for updates
+	// hourly while it is, and at most every six hours otherwise.
+	SetWindowVisible(ctx context.Context, visible bool) error
 
 	// --- events ---
 
@@ -179,6 +183,9 @@ type ServerInfo struct {
 	SiteName string `json:"site_name"`
 	Quota    int64  `json:"quota"`
 	Used     int64  `json:"used"`
+	// Admin: the account administers the server (may fix the number of
+	// parallel transfers).
+	Admin bool `json:"admin"`
 }
 
 // ProbeRequest is the input of ProbeServer.

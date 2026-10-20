@@ -31,6 +31,9 @@ func (e *Engine) timerLoop() {
 			if n%2 == 0 {
 				e.xfer.Tick(now)
 			}
+			if n%3 == 0 {
+				e.govern()
+			}
 			if n%5 == 0 {
 				e.refreshStatus()
 			}
@@ -43,6 +46,9 @@ func (e *Engine) timerLoop() {
 			if n%30 == 0 {
 				e.runSchedules()
 				e.periodicRescans(now)
+			}
+			if n%60 == 0 {
+				e.checkDeferredSoon()
 			}
 			if n%120 == 0 {
 				go e.refreshAutomations()

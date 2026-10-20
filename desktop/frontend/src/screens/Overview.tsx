@@ -7,6 +7,16 @@ import { formatBytes, formatDuration, formatSpeed, timeAgo } from '../lib'
 
 const DISMISS_KEY = 'vd.failedDismissedAt'
 
+// limitLine explains the parallel transfer limit under the stat.
+function limitLine(s?: engine.Stats) {
+  if (!s) return '-'
+  const g = s.governor
+  if (!g) return `fixed limit ${s.concurrency_limit}`
+  if (g.held) return 'waiting: your computer is busy'
+  if (g.heavy) return `limit ${s.concurrency_limit} (game running)`
+  return `limit ${s.concurrency_limit} of ${g.hardware} for this PC`
+}
+
 // phaseLabel is the right-hand status of a transfer row.
 function phaseLabel(a: engine.ActiveView) {
   if (a.phase === 'hashing') return 'checking file…'
@@ -99,7 +109,7 @@ export function Overview({ snap, boot, goto }: { snap: engine.Snapshot | null; b
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="grid grid-cols-2 content-start gap-3">
           <Stat compact label="Upload speed" value={formatSpeed(s?.speed_bps ?? 0)} sub={s?.eta_seconds ? `${formatDuration(s.eta_seconds)} remaining` : 'no active uploads'} icon={<Gauge className="size-5" />} />
-          <Stat compact label="Parallel transfers" value={`${s?.concurrency ?? 0}`} sub={`adaptive limit ${s?.concurrency_limit ?? '-'}`} icon={<Layers className="size-5" />} tone="sky" />
+          <Stat compact label="Parallel transfers" value={`${s?.concurrency ?? 0}`} sub={limitLine(s)} icon={<Layers className="size-5" />} tone="sky" />
           <Stat compact label="Queued" value={`${s?.queued ?? 0}`} sub={formatBytes(s?.pending_bytes ?? 0) + ' to upload'} icon={<Timer className="size-5" />} tone="amber" />
           <Stat compact label="Uploaded this session" value={`${s?.session_completed ?? 0}`} sub={formatBytes(s?.session_bytes ?? 0)} icon={<CheckCircle2 className="size-5" />} tone="green" />
         </div>
@@ -144,6 +154,11 @@ export function Overview({ snap, boot, goto }: { snap: engine.Snapshot | null; b
           )}
         </div>
       </div>
+      {(s?.verifying ?? 0) > 0 && (
+        <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200">
+          {s?.verifying} uploaded file(s) are being checked by the server. Large syncs are checked once everything is sent; anything that did not arrive intact is uploaded again.
+        </div>
+      )}
       {showFailed && (
         <div className="mt-4 flex items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200">
           <button onClick={() => goto('transfers')} className="flex min-w-0 flex-1 items-center gap-3 text-left">

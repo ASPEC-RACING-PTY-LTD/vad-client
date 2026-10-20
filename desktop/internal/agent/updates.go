@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/engine"
@@ -12,10 +13,28 @@ import (
 	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/updater"
 )
 
+// When updates are checked:
+//   - once at start (unless the last check was within the hour, so restarts
+//     do not repeat it);
+//   - every hour while the app window is open on screen, even if another
+//     window is in front;
+//   - every six hours while it is hidden (tray or taskbar) and the machine
+//     is on;
+//   - when a sync is queued for a changed file.
+//
+// Every trigger respects one shared "last checked" time: while the window is
+// hidden nothing checks more often than every six hours (a start-up check
+// followed by a sync a minute later is one check), and while it is open not
+// more often than hourly. Opening the window checks when the last check is
+// more than an hour old. The time is kept across restarts, and a failed
+// check counts, so an offline machine does not retry constantly.
 const (
-	updateFirstCheck = 2 * time.Minute
-	updateInterval   = 6 * time.Hour
-	updateIdlePoll   = time.Minute
+	updateStartDelay  = 30 * time.Second
+	updateOpen        = time.Hour
+	updateHidden      = 6 * time.Hour
+	updateTick        = time.Minute
+	updateIdlePoll    = time.Minute
+	updateLastCheckKV = "updates/last_check"
 )
 
 func (h *Host) updaterLocked() *updater.Updater {
@@ -41,18 +60,82 @@ func (h *Host) autoUpdateEnabled() bool {
 // updateLoop checks for releases in the background. With automatic updates
 // on, a new version is downloaded, verified and installed once sync is idle.
 func (h *Host) updateLoop() {
-	u := h.updater()
-	timer := time.NewTimer(updateFirstCheck)
-	defer timer.Stop()
+	select {
+	case <-h.ctx.Done():
+		return
+	case <-time.After(updateStartDelay): // let the network come up after sign-in
+	}
+	h.maybeCheckUpdates("start")
+	tick := time.NewTicker(updateTick)
+	defer tick.Stop()
 	for {
 		select {
 		case <-h.ctx.Done():
 			return
-		case <-timer.C:
+		case <-tick.C:
+			h.maybeCheckUpdates("timer")
 		}
-		h.updateOnce(u)
-		timer.Reset(updateInterval)
 	}
+}
+
+// maybeCheckUpdates runs a check when the interval for the window's state
+// has passed since the last one. reason "start" checks unless the last check
+// was within the hour.
+func (h *Host) maybeCheckUpdates(reason string) {
+	if !h.opts.AutoUpdates || h.opts.UpdateRepo == "" {
+		return
+	}
+	h.mu.Lock()
+	last := h.lastUpdateCheck
+	if last.IsZero() && h.st != nil {
+		if ms, err := strconv.ParseInt(h.st.Get(updateLastCheckKV), 10, 64); err == nil {
+			last = time.UnixMilli(ms)
+		}
+	}
+	if h.updateChecking || !updateDue(last, h.windowVisible, reason, time.Now()) {
+		h.mu.Unlock()
+		return
+	}
+	h.updateChecking = true
+	h.lastUpdateCheck = time.Now()
+	h.mu.Unlock()
+	if h.st != nil {
+		h.st.Set(updateLastCheckKV, strconv.FormatInt(time.Now().UnixMilli(), 10))
+	}
+	h.log.Info("checking for updates", "reason", reason)
+	h.goLoop(func() {
+		defer func() {
+			h.mu.Lock()
+			h.updateChecking = false
+			h.mu.Unlock()
+		}()
+		h.updateOnce(h.updater())
+	})
+}
+
+// updateDue reports whether a check is due: hourly while the window is open
+// (and at start), every six hours while it is hidden.
+func updateDue(last time.Time, visible bool, reason string, now time.Time) bool {
+	interval := updateHidden
+	if visible || reason == "start" {
+		interval = updateOpen
+	}
+	return last.IsZero() || now.Sub(last) >= interval
+}
+
+// SetWindowVisible records whether the app window is open on screen; opening
+// it checks for updates when the last check is more than an hour old.
+func (h *Host) SetWindowVisible(ctx context.Context, visible bool) error {
+	if err := h.live(); err != nil {
+		return err
+	}
+	h.mu.Lock()
+	h.windowVisible = visible
+	h.mu.Unlock()
+	if visible {
+		h.maybeCheckUpdates("window")
+	}
+	return nil
 }
 
 func (h *Host) updateOnce(u *updater.Updater) {

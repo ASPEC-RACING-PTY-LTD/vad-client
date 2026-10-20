@@ -30,6 +30,9 @@ function UpdateLine({ u }: { u: updater.Status }) {
   }
 }
 
+const autoHint =
+  'VaultDock adds connections only while they make uploads faster, and keeps about a quarter of the processor, memory and disk free. While a game or other graphics-heavy program runs it uses much less, and when the computer is very busy new files wait.'
+
 export function SettingsScreen({ boot, snap, onChanged }: { boot: agent.Bootstrap; snap: engine.Snapshot | null; onChanged: () => void }) {
   const [s, setS] = useState<config.Settings | null>(null)
   const [update, setUpdate] = useState<updater.Status | null>(null)
@@ -65,20 +68,28 @@ export function SettingsScreen({ boot, snap, onChanged }: { boot: agent.Bootstra
 
       <section className="card space-y-4 p-6">
         <h2 className="font-semibold">Transfers</h2>
-        <Field label="Parallel transfers">
-          <select className="input" value={s.concurrency_mode} onChange={(e) => save({ concurrency_mode: e.target.value })}>
-            <option value="auto">Automatic: adapt to connection and server performance</option>
-            <option value="manual">Fixed number</option>
-          </select>
-        </Field>
-        {s.concurrency_mode === 'auto' ? (
-          <Field label="Upper limit for automatic mode" hint="VaultDock measures throughput, latency and errors and only adds connections while they help. The server can lower this limit.">
-            <input className="input" type="number" min={1} max={128} value={s.max_parallel} onChange={(e) => save({ max_parallel: Number(e.target.value) })} />
+        {boot.server_info?.admin ? (
+          <Field label="Parallel transfers" hint={autoHint}>
+            <select className="input" value={s.concurrency_mode} onChange={(e) => save({ concurrency_mode: e.target.value })}>
+              <option value="auto">Automatic: adapt to the connection, the server and this computer</option>
+              <option value="manual">Fixed number (administrators only)</option>
+            </select>
           </Field>
         ) : (
-          <Field label="Fixed parallel transfers">
+          <Field label="Parallel transfers" hint={autoHint}>
+            <div className="input bg-slate-50 text-slate-600 dark:bg-slate-800/50 dark:text-slate-300">Automatic</div>
+          </Field>
+        )}
+        {boot.server_info?.admin && s.concurrency_mode === 'manual' && (
+          <Field label="Fixed parallel transfers" hint="Used as set, whatever else the computer is doing.">
             <input className="input" type="number" min={1} max={128} value={s.manual_parallel} onChange={(e) => save({ manual_parallel: Number(e.target.value) })} />
           </Field>
+        )}
+        {snap?.stats.governor && (
+          <p className="text-sm text-slate-500">
+            Now: up to {snap.stats.concurrency_limit} at once (this computer can take up to {snap.stats.governor.hardware}).
+            {snap.stats.governor.reason ? ` ${snap.stats.governor.reason[0].toUpperCase()}${snap.stats.governor.reason.slice(1)}.` : ''}
+          </p>
         )}
         <Field label="Upload bandwidth limit (KB/s)" hint="0 means unlimited. Leaves room for gaming and calls on slower connections.">
           <input className="input" type="number" min={0} value={s.bandwidth_kbps} onChange={(e) => save({ bandwidth_kbps: Number(e.target.value) })} />

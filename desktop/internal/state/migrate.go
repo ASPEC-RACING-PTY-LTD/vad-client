@@ -71,6 +71,15 @@ CREATE TABLE sync_base (
 	sha256 TEXT NOT NULL, size INTEGER NOT NULL, mtime INTEGER NOT NULL, updated_at INTEGER NOT NULL,
 	PRIMARY KEY (folder_id, rel_path)
 );`},
+	// Uploads the server finishes later (upload.deferred_finish): sent, but
+	// not yet confirmed stored. item is the queue item as JSON, so a file
+	// that did not make it is queued again as it was.
+	{Version: 8, Name: "deferred_uploads", SQL: `
+CREATE TABLE deferred_uploads (
+	config_id TEXT NOT NULL, rel_path TEXT NOT NULL, upload_id TEXT NOT NULL, sha256 TEXT NOT NULL,
+	item TEXT NOT NULL, created_at INTEGER NOT NULL,
+	PRIMARY KEY (config_id, rel_path)
+);`},
 }
 
 // baseline adopts a database created before schema_version existed: when

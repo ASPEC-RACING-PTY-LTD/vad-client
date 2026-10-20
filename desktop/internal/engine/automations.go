@@ -223,6 +223,7 @@ func (e *Engine) finishRunIfIdle(cfgID string) {
 	if e.st.PendingForConfig(cfgID) > 0 {
 		return
 	}
+	defer e.checkDeferredSoon()
 	e.mu.Lock()
 	for _, a := range e.active {
 		if a.item.ConfigID == cfgID {

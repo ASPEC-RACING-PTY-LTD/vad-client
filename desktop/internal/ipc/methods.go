@@ -95,6 +95,7 @@ var handlers = map[string]handler{
 	"UpdateStatus":       m0(agent.API.UpdateStatus),
 	"CheckForUpdates":    m0(agent.API.CheckForUpdates),
 	"InstallUpdate":      e0(agent.API.InstallUpdate),
+	"SetWindowVisible":   e1(agent.API.SetWindowVisible),
 
 	"KeyStatus":             m0(agent.API.KeyStatus),
 	"ConfirmServerIdentity": m1(agent.API.ConfirmServerIdentity),

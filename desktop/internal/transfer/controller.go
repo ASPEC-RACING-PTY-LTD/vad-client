@@ -27,6 +27,7 @@ type Controller struct {
 	limit    int
 	max      int
 	manual   int
+	ceiling  int // the governor's ceiling for automatic mode (0 = none)
 	inflight int
 	changed  chan struct{}
 	// waiting counts the Acquire calls waiting per priority; a free slot
@@ -90,11 +91,31 @@ func (c *Controller) CapMax(n int) {
 	c.max = clamp(min(c.max, n), 1, AbsoluteMax)
 }
 
+// SetCeiling bounds the automatic limit by what the computer can spare
+// (Governor); 0 removes the bound. A fixed (manual) limit ignores it.
+func (c *Controller) SetCeiling(n int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if n == c.ceiling {
+		return
+	}
+	c.ceiling = max(0, n)
+	c.notify()
+}
+
+// effective is the limit in force. Callers hold c.mu.
+func (c *Controller) effective() int {
+	if c.manual == 0 && c.ceiling > 0 {
+		return max(1, min(c.limit, c.ceiling))
+	}
+	return c.limit
+}
+
 // Limit returns the current parallel request limit.
 func (c *Controller) Limit() int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.limit
+	return c.effective()
 }
 
 // Inflight returns the number of requests in progress.
@@ -129,9 +150,9 @@ func (c *Controller) AcquirePriority(ctx context.Context, prio int64) error {
 		c.mu.Unlock()
 	}()
 	for {
-		if c.inflight < c.limit && c.first(prio) {
+		if c.inflight < c.effective() && c.first(prio) {
 			c.inflight++
-			if c.inflight >= c.limit && c.satSince.IsZero() {
+			if c.inflight >= c.effective() && c.satSince.IsZero() {
 				c.satSince = time.Now()
 			}
 			return nil
@@ -162,7 +183,7 @@ func (c *Controller) first(prio int64) bool {
 func (c *Controller) Release(bytes int64, latency time.Duration, congestion bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.inflight >= c.limit && !c.satSince.IsZero() {
+	if c.inflight >= c.effective() && !c.satSince.IsZero() {
 		c.satTime += time.Since(c.satSince)
 		c.satSince = time.Time{}
 	}
@@ -239,7 +260,13 @@ func (c *Controller) Tick(now time.Time) {
 		c.prevTput = max(c.prevTput*0.98, tput)
 		c.holdUntil = now.Add(20 * time.Second)
 	}
-	c.limit = clamp(c.limit, 1, c.max)
+	// Probing above the governor's ceiling would only measure a limit that
+	// is not used.
+	hi := c.max
+	if c.ceiling > 0 {
+		hi = min(hi, c.ceiling)
+	}
+	c.limit = clamp(c.limit, 1, hi)
 	if c.limit != old {
 		c.notify()
 	}

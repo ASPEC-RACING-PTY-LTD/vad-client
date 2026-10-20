@@ -253,6 +253,7 @@ export namespace agent {
 	    site_name: string;
 	    quota: number;
 	    used: number;
+	    admin: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new ServerInfo(source);
@@ -264,6 +265,7 @@ export namespace agent {
 	        this.site_name = source["site_name"];
 	        this.quota = source["quota"];
 	        this.used = source["used"];
+	        this.admin = source["admin"];
 	    }
 	}
 	export class EnrollView {
@@ -775,6 +777,8 @@ export namespace engine {
 	    session_completed: number;
 	    session_bytes: number;
 	    last_failed_at: number;
+	    governor?: transfer.GovernorState;
+	    verifying: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new Stats(source);
@@ -793,7 +797,27 @@ export namespace engine {
 	        this.session_completed = source["session_completed"];
 	        this.session_bytes = source["session_bytes"];
 	        this.last_failed_at = source["last_failed_at"];
+	        this.governor = this.convertValues(source["governor"], transfer.GovernorState);
+	        this.verifying = source["verifying"];
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class Snapshot {
 	    status: string;
@@ -1170,6 +1194,33 @@ export namespace state {
 	        this.error = source["error"];
 	        this.manual = source["manual"];
 	        this.created_at = source["created_at"];
+	    }
+	}
+
+}
+
+export namespace transfer {
+	
+	export class GovernorState {
+	    ceiling: number;
+	    hardware: number;
+	    held: boolean;
+	    heavy: boolean;
+	    load: number;
+	    reason?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new GovernorState(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ceiling = source["ceiling"];
+	        this.hardware = source["hardware"];
+	        this.held = source["held"];
+	        this.heavy = source["heavy"];
+	        this.load = source["load"];
+	        this.reason = source["reason"];
 	    }
 	}
 

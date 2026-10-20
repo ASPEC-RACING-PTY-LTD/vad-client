@@ -155,6 +155,10 @@ func (c *InProc) CheckForUpdates(ctx context.Context) (updater.Status, error) {
 	return call0(ctx, c.api.CheckForUpdates)
 }
 
+func (c *InProc) SetWindowVisible(ctx context.Context, visible bool) error {
+	return callErr(ctx, visible, c.api.SetWindowVisible)
+}
+
 func (c *InProc) InstallUpdate(ctx context.Context) error {
 	return callErr(ctx, none{}, func(ctx context.Context, _ none) error { return c.api.InstallUpdate(ctx) })
 }

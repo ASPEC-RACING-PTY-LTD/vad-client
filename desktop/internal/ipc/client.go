@@ -616,6 +616,10 @@ func (c *Client) CheckForUpdates(ctx context.Context) (updater.Status, error) {
 	return invoke[updater.Status](c, ctx, "CheckForUpdates", nil)
 }
 
+func (c *Client) SetWindowVisible(ctx context.Context, visible bool) error {
+	return c.call(ctx, "SetWindowVisible", visible, nil)
+}
+
 func (c *Client) InstallUpdate(ctx context.Context) error {
 	return c.call(ctx, "InstallUpdate", nil, nil)
 }

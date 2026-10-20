@@ -13,12 +13,23 @@ func TestApplySettingsReachesTransferCore(t *testing.T) {
 	if e.ctrl != e.xfer.Controller() {
 		t.Fatal("engine controller is not the transfer core's controller")
 	}
-	e.ApplySettings(config.Settings{ConcurrencyMode: "manual", ManualParallel: 7, MaxParallel: 64})
-	if got := e.xfer.Limit(); got != 7 {
-		t.Fatalf("manual limit not applied: %d", got)
+	// Only a server administrator may fix the number of transfers.
+	fixed := config.Settings{ConcurrencyMode: "manual", ManualParallel: 7}
+	e.ApplySettings(fixed)
+	if got := e.xfer.Limit(); got == 7 || e.manual.Load() {
+		t.Fatalf("a fixed limit applied for a non-administrator: %d", got)
 	}
-	e.ApplySettings(config.Settings{MaxParallel: 3})
+	e.mu.Lock()
+	e.admin = true
+	e.mu.Unlock()
+	e.ApplySettings(fixed)
+	if got := e.xfer.Limit(); got != 7 {
+		t.Fatalf("administrator's fixed limit not applied: %d", got)
+	}
+	// Automatic mode is bounded by the governor's ceiling.
+	e.ApplySettings(config.Settings{})
+	e.ctrl.SetCeiling(3)
 	if got := e.ctrl.Limit(); got > 3 {
-		t.Fatalf("max not applied: %d", got)
+		t.Fatalf("ceiling not applied: %d", got)
 	}
 }

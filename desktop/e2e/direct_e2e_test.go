@@ -202,3 +202,30 @@ func freePort(t *testing.T) string {
 }
 
 func itoa(n int64) string { return strconv.FormatInt(n, 10) }
+
+// A folder's first sync hands each upload to the server to finish later and
+// collects the outcomes when the sync is done: every file ends up synced.
+func TestBigSyncChecksAfterward(t *testing.T) {
+	srv := testkit.Start(t)
+	e, st := newEngine(t, srv)
+	root := t.TempDir()
+	for i := range 6 {
+		writeFileBytes(t, filepath.Join(root, "clip"+itoa(int64(i))+".mp4"), bytes.Repeat([]byte{byte(i)}, 3<<20+i))
+	}
+	cfg, err := e.SaveConfig(config.SyncConfig{Name: "Clips", Enabled: true, Kind: "folder", LocalPath: root, Destination: "/Clips", Recursive: true, StableSeconds: 1, Mode: "auto"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, 60*time.Second, "all files checked", func() bool {
+		synced, _, _ := st.ConfigCounts(cfg.ID)
+		return synced == 6 && st.DeferredCount("") == 0
+	})
+	for i := range 6 {
+		if !exists(srv, "/Clips/clip"+itoa(int64(i))+".mp4") {
+			t.Fatalf("clip%d missing on the server", i)
+		}
+	}
+	if h, _ := st.History("completed", 20); len(h) != 6 {
+		t.Fatalf("history has %d completed uploads, want 6", len(h))
+	}
+}

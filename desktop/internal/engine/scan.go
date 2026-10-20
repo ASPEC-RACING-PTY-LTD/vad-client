@@ -319,6 +319,9 @@ func (e *Engine) consider(cfg *config.SyncConfig, flt *filter.Filter, rel, abs s
 	e.run(cfg.ID)
 	e.mu.Unlock()
 	e.kick()
+	if e.OnQueued != nil {
+		e.OnQueued()
+	}
 	return true
 }
 
