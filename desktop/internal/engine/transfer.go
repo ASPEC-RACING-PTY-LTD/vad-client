@@ -9,6 +9,7 @@ import (
 
 	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/state"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/transfer"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/automation"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/client"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
@@ -330,6 +331,9 @@ func (e *Engine) process(at *activeTransfer) {
 	// The server keeps compressed chunks as they are and does not compress
 	// the raw ones again (they did not shrink here).
 	req.Compressed = cfg.Compress && e.serverHas(wire.FeatureUploadCompressedFlag)
+	if e.serverHas(wire.FeatureUploadIdentity) {
+		e.setIdentity(&req, it, fi)
+	}
 	// Queue order is the priority: the file that started first gets the
 	// connections and finishes first.
 	res, err := e.xfer.Upload(ctx, c, req, f, transfer.Progress{Sent: &at.sent, Phase: func(p string) { at.phase.Store(p); e.kickIf(p == "finalizing") }, Compress: cfg.Compress, Priority: it.ID, Session: func(id string) { at.uploadID.Store(id) }, FinishLater: e.bulkRun(it.ConfigID)})
@@ -361,7 +365,7 @@ func (e *Engine) process(at *activeTransfer) {
 	e.mu.Lock()
 	e.netFailures = 0
 	r := e.run(it.ConfigID)
-	if res.Result != "unchanged" && res.Result != "skipped" {
+	if res.Result != "unchanged" && res.Result != "skipped" && res.Result != "moved" {
 		r.uploaded++
 		r.bytes += size
 		e.session.completed++
@@ -378,6 +382,34 @@ func (e *Engine) process(at *activeTransfer) {
 	_ = e.st.Done(it.ID)
 	e.st.AddHistory(state.HistoryEntry{ConfigID: it.ConfigID, RelPath: it.RelPath, RemotePath: it.RemotePath(), Size: size, Status: "completed", Result: res.Result, DurationMS: time.Since(at.started).Milliseconds()})
 	e.log.Info("uploaded", "file", it.RelPath, "remote", it.RemotePath(), "result", res.Result, "bytes", size, "ms", time.Since(at.started).Milliseconds())
+}
+
+// setIdentity tells the server which file an upload continues, so new
+// content updates the stored file in place (same id, dates, tags and
+// folder) instead of arriving as a new file or a conflict copy:
+//   - BaseSHA256: the content last uploaded from this file to the same
+//     remote path, or to its old path after a rename;
+//   - PreviousPath: that old remote path, for a local rename or move;
+//   - FileCreatedAt: the file's creation time on this computer, which the
+//     server keeps from the first upload on.
+//
+// The local mtime still drives change detection; none of this changes it.
+func (e *Engine) setIdentity(req *client.UploadRequest, it state.Item, fi os.FileInfo) {
+	if ct := createdTime(fi); !ct.IsZero() && ct.Before(fi.ModTime().Add(time.Second)) {
+		req.FileCreatedAt = ct.UnixMilli()
+	} else {
+		req.FileCreatedAt = fi.ModTime().UnixMilli() // copied files can carry a creation time after their mtime
+	}
+	prev, err := e.st.File(it.ConfigID, it.RelPath)
+	if err != nil || prev.SHA256 == "" || prev.RemotePath == "" {
+		return
+	}
+	switch {
+	case prev.RemotePath == req.Path:
+		req.BaseSHA256 = prev.SHA256
+	case it.Event == automation.EventFileRenamed:
+		req.BaseSHA256, req.PreviousPath = prev.SHA256, prev.RemotePath
+	}
 }
 
 // Bounds on waiting for a file that cannot be opened, typically because

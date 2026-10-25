@@ -101,12 +101,29 @@ func (e *Engine) Scan(cfgID string, manual bool) (int, error) {
 	for _, sk := range w.skips {
 		skipped(sk.rel, sk.err)
 	}
+	// A file renamed or moved while VaultDock was not watching shows up as
+	// a new path plus a vanished one with the same size and mtime. Matched
+	// one to one, it is synchronised as a rename (the server moves its copy)
+	// instead of a new file. Ambiguous matches stay new files.
+	renamedFrom := renames(w, index)
+	renamedTo := map[string]bool{}
+	for _, old := range renamedFrom {
+		renamedTo[old] = true
+	}
 	for _, h := range w.hits {
 		if h.probe != nil {
 			skipped(h.rel, h.probe)
 			if classifyIssue(h.probe) != issueLocked {
 				continue // cannot be read at all; a locked file is still queued and deferred by the transfer
 			}
+		}
+		if old := renamedFrom[h.rel]; old != "" {
+			_ = e.st.MoveFile(cfgID, old, h.rel)
+			e.st.RemoveQueued(cfgID, old)
+			if e.consider(cfg, flt, h.rel, h.abs, h.fi, automation.EventFileRenamed, manual, old, 0) {
+				queued++
+			}
+			continue
 		}
 		prev, known := index[h.rel]
 		ev := "file.created"
@@ -120,13 +137,50 @@ func (e *Engine) Scan(cfgID string, manual bool) (int, error) {
 	e.setLastErr(cfgID, "")
 	// Files that disappeared: record as deleted locally (server copies stay).
 	for _, rel := range w.gone {
-		e.fileDeleted(cfg, rel)
+		if !renamedTo[rel] {
+			e.fileDeleted(cfg, rel)
+		}
 	}
 	if w.walkErr != nil && e.ctx != nil && e.ctx.Err() == nil {
 		e.log.Warn("scan incomplete", "config", cfg.Name, "err", w.walkErr)
 	}
 	e.log.Info("scan finished", "config", cfg.Name, "queued", queued, "files_seen", len(w.seen))
 	return queued, w.walkErr
+}
+
+// renames pairs new paths with vanished synced files of the same size and
+// mtime (new path -> old path). Only one-to-one matches count.
+func renames(w walkResult, index map[string]state.FileEntry) map[string]string {
+	out := map[string]string{}
+	if len(w.gone) == 0 {
+		return out
+	}
+	key := func(size, mtime int64) string {
+		return strconv.FormatInt(size, 10) + "|" + strconv.FormatInt(mtime, 10)
+	}
+	gone := map[string][]string{}
+	for _, rel := range w.gone {
+		if g := index[rel]; g.Status == "synced" && g.SHA256 != "" {
+			k := key(g.Size, g.MTime)
+			gone[k] = append(gone[k], rel)
+		}
+	}
+	hits := map[string][]string{}
+	for _, h := range w.hits {
+		if prev, known := index[h.rel]; known && prev.Status != "deleted" {
+			continue
+		}
+		k := key(h.fi.Size(), h.fi.ModTime().UnixNano())
+		if len(gone[k]) == 1 {
+			hits[k] = append(hits[k], h.rel)
+		}
+	}
+	for k, rels := range hits {
+		if len(rels) == 1 {
+			out[rels[0]] = gone[k][0]
+		}
+	}
+	return out
 }
 
 // scanHit is a new or changed file found by collect.
