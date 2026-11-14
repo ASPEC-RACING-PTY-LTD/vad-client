@@ -28,6 +28,7 @@ import { ModeSection } from "./Mode";
 import { EventsOn } from "../../wailsjs/runtime/runtime";
 import { Button, Field, PageLoader, Toggle, useUI } from "../ui";
 import { errMsg, timeAgo } from "../lib";
+import { LockSettings } from "./Lock";
 
 function UpdateLine({ u }: { u: updater.Status }) {
   const checked = u.checked_at ? ` Checked ${timeAgo(u.checked_at)}.` : "";
@@ -163,7 +164,15 @@ export function SettingsScreen({
               label="Desktop notifications"
               description="Shown by automations that send notifications to the desktop."
             />
+            <Toggle
+              checked={!s.sync_during_games}
+              onChange={(v) => save({ sync_during_games: !v })}
+              label="Pause while playing games"
+              description="Syncing and scheduled backups wait while a game from Steam, Epic Games, Ubisoft Connect, EA, GOG, Battle.net, Xbox, Riot or another launcher is running, and continue when it closes."
+            />
           </section>
+
+          <LockSettings className={section} />
 
           <section className={section}>
             <h2 className="font-semibold">Transfers</h2>

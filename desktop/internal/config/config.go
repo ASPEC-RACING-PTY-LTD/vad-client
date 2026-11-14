@@ -231,6 +231,9 @@ type Settings struct {
 	// were turned on (-1: take it from the next check). An administrator's
 	// reset raises the server's value, which turns DirectUpload off.
 	DirectResetGen int64 `json:"direct_reset_gen,omitempty"`
+	// SyncDuringGames keeps syncing and backing up while a game runs. Off
+	// by default: everything waits until the game closes.
+	SyncDuringGames bool `json:"sync_during_games"`
 }
 
 func DefaultSettings() Settings {

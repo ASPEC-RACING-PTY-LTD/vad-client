@@ -248,6 +248,28 @@ export namespace agent {
 		}
 	}
 	
+	export class LockStatus {
+	    enabled: boolean;
+	    locked: boolean;
+	    hello: boolean;
+	    hello_key?: string;
+	    hello_box?: number[];
+	    retry_after?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new LockStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.enabled = source["enabled"];
+	        this.locked = source["locked"];
+	        this.hello = source["hello"];
+	        this.hello_key = source["hello_key"];
+	        this.hello_box = source["hello_box"];
+	        this.retry_after = source["retry_after"];
+	    }
+	}
 	export class ServerInfo {
 	    version: string;
 	    site_name: string;
@@ -306,6 +328,7 @@ export namespace agent {
 	    os: string;
 	    user: string;
 	    server_info?: ServerInfo;
+	    lock: LockStatus;
 	
 	    static createFrom(source: any = {}) {
 	        return new Bootstrap(source);
@@ -324,6 +347,7 @@ export namespace agent {
 	        this.os = source["os"];
 	        this.user = source["user"];
 	        this.server_info = this.convertValues(source["server_info"], ServerInfo);
+	        this.lock = this.convertValues(source["lock"], LockStatus);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -395,6 +419,7 @@ export namespace agent {
 	        this.run_uuid = source["run_uuid"];
 	    }
 	}
+	
 	
 	export class PreviewResult {
 	    entries: engine.PreviewEntry[];
@@ -492,6 +517,7 @@ export namespace config {
 	    direct_upload: boolean;
 	    direct_url?: string;
 	    direct_reset_gen?: number;
+	    sync_during_games: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Settings(source);
@@ -518,6 +544,7 @@ export namespace config {
 	        this.direct_upload = source["direct_upload"];
 	        this.direct_url = source["direct_url"];
 	        this.direct_reset_gen = source["direct_reset_gen"];
+	        this.sync_during_games = source["sync_during_games"];
 	    }
 	}
 	export class SyncConfig {
@@ -868,6 +895,26 @@ export namespace engine {
 
 export namespace main {
 	
+	export class AppLock {
+	    enabled: boolean;
+	    locked: boolean;
+	    hello: boolean;
+	    hello_supported: boolean;
+	    retry_after?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new AppLock(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.enabled = source["enabled"];
+	        this.locked = source["locked"];
+	        this.hello = source["hello"];
+	        this.hello_supported = source["hello_supported"];
+	        this.retry_after = source["retry_after"];
+	    }
+	}
 	export class BackupJobDraft {
 	    id: number;
 	    revision: number;
@@ -989,6 +1036,32 @@ export namespace main {
 		    }
 		    return a;
 		}
+	}
+	export class ServiceHealth {
+	    mode: string;
+	    installed: boolean;
+	    state: string;
+	    reachable: boolean;
+	    agent_path?: string;
+	    missing: boolean;
+	    problem?: string;
+	    hint?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ServiceHealth(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.mode = source["mode"];
+	        this.installed = source["installed"];
+	        this.state = source["state"];
+	        this.reachable = source["reachable"];
+	        this.agent_path = source["agent_path"];
+	        this.missing = source["missing"];
+	        this.problem = source["problem"];
+	        this.hint = source["hint"];
+	    }
 	}
 
 }
@@ -1208,6 +1281,7 @@ export namespace transfer {
 	    heavy: boolean;
 	    load: number;
 	    reason?: string;
+	    game?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new GovernorState(source);
@@ -1221,6 +1295,7 @@ export namespace transfer {
 	        this.heavy = source["heavy"];
 	        this.load = source["load"];
 	        this.reason = source["reason"];
+	        this.game = source["game"];
 	    }
 	}
 

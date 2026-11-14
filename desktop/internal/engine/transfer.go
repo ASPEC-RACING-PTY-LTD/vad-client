@@ -139,6 +139,8 @@ func (e *Engine) refreshStatus() {
 		e.status, e.message = "paused", "Synchronisation is paused"
 	case time.Now().Before(e.offlineUntil):
 		e.status, e.message = "offline", "Server unreachable; retrying automatically"
+	case e.game.Load() != "":
+		e.status, e.message = "waiting", "Paused while "+e.game.Load()+" is running"
 	case e.held.Load() && pending > 0:
 		e.status, e.message = "waiting", "Your computer is busy; transfers continue when it has room"
 	case len(e.active) > 0 || pending > 0:

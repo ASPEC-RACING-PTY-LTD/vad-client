@@ -93,15 +93,21 @@ var methodAccess = map[string]Access{
 	// 2026-10-19: every feature works without Windows administrator rights;
 	// only (re)installing needs elevation, and the installer asks for it
 	// through UAC itself. File access still runs under each owner's token.
-	"ProbeServer":        AccessUser,
-	"Connect":            AccessUser,
-	"CancelEnrollment":   AccessUser,
-	"Disconnect":         AccessUser,
-	"SaveSettings":       AccessUser,
-	"SetPaused":          AccessUser,
-	"CheckForUpdates":    AccessUser,
-	"InstallUpdate":      AccessUser,
-	"SetWindowVisible":   AccessUser,
+	"ProbeServer":      AccessUser,
+	"Connect":          AccessUser,
+	"CancelEnrollment": AccessUser,
+	"Disconnect":       AccessUser,
+	"SaveSettings":     AccessUser,
+	"SetPaused":        AccessUser,
+	"CheckForUpdates":  AccessUser,
+	"InstallUpdate":    AccessUser,
+	"SetWindowVisible": AccessUser,
+	// App lock: unlocking needs the PIN or Windows Hello; tries are limited.
+	"LockStatus":         AccessRead,
+	"SetupLock":          AccessUser,
+	"Unlock":             AccessUser,
+	"Lock":               AccessUser,
+	"SetHello":           AccessUser,
 	"ConfirmRecoveryKey": AccessUser,
 	// First-run key setup: the repository and the trusted server identity
 	// are machine-wide; InitRepository returns the recovery key once.

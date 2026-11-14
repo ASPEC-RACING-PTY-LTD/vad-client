@@ -30,19 +30,49 @@ func (e *Engine) applyBounds() {
 // govern samples the computer's load and updates the ceiling (about every
 // three seconds).
 func (e *Engine) govern() {
-	if e.manual.Load() {
-		return
-	}
 	if e.sampler == nil {
 		e.sampler = sysload.New()
 		return // the first sample needs an interval
 	}
-	st := e.gov.Update(e.sampler.Sample())
-	e.ctrl.SetCeiling(st.Ceiling)
+	e.mu.Lock()
+	e.gov.PauseForGames = !e.settings.SyncDuringGames
+	e.mu.Unlock()
+	sample := e.sampler.Sample()
+	var st transfer.GovernorState
+	if e.manual.Load() {
+		// A fixed number of transfers: only a running game holds them.
+		if sample.Game != "" && e.gov.PauseForGames {
+			st.Held, st.Game = true, sample.Game
+		}
+	} else {
+		st = e.gov.Update(sample)
+		e.ctrl.SetCeiling(st.Ceiling)
+	}
+	if prev := e.game.Swap(st.Game); prev != st.Game {
+		if st.Game != "" {
+			// A game started: transfers in progress stop and go back to the
+			// queue (resuming their upload sessions afterwards), as when
+			// paused.
+			e.log.Info("game running; transfers paused", "game", st.Game)
+			e.mu.Lock()
+			for _, at := range e.active {
+				if at.cancel != nil {
+					at.cancel()
+				}
+			}
+			e.mu.Unlock()
+		} else {
+			e.log.Info("game closed; transfers resume", "game", prev)
+		}
+		e.refreshStatus()
+	}
 	if was := e.held.Swap(st.Held); was && !st.Held {
 		e.kick()
 	}
 }
+
+// Gaming returns the running game transfers wait for ("" when none).
+func (e *Engine) Gaming() string { return e.game.Load() }
 
 // Governor returns the latest load decision (nil in fixed mode).
 func (e *Engine) governorState() *transfer.GovernorState {

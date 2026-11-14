@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"unsafe"
 
 	"golang.org/x/sys/windows"
 )
@@ -47,6 +48,52 @@ func relaunchElevated() error {
 	}
 	return nil
 }
+
+// runElevated runs exe with args after the Windows administrator prompt
+// and waits (up to a minute) for it to finish.
+func runElevated(exe string, args string) error {
+	var info struct {
+		cbSize       uint32
+		fMask        uint32
+		hwnd         windows.Handle
+		lpVerb       *uint16
+		lpFile       *uint16
+		lpParameters *uint16
+		lpDirectory  *uint16
+		nShow        int32
+		hInstApp     windows.Handle
+		lpIDList     uintptr
+		lpClass      *uint16
+		hkeyClass    windows.Handle
+		dwHotKey     uint32
+		hIcon        windows.Handle
+		hProcess     windows.Handle
+	}
+	info.cbSize = uint32(unsafe.Sizeof(info))
+	info.fMask = 0x00000040 // SEE_MASK_NOCLOSEPROCESS
+	info.lpVerb, _ = windows.UTF16PtrFromString("runas")
+	info.lpFile, _ = windows.UTF16PtrFromString(exe)
+	info.lpParameters, _ = windows.UTF16PtrFromString(args)
+	info.nShow = windows.SW_HIDE
+	if r, _, err := procShellExecuteEx.Call(uintptr(unsafe.Pointer(&info))); r == 0 {
+		if err == windows.ERROR_CANCELLED {
+			return fmt.Errorf("administrator rights were not granted")
+		}
+		return err
+	}
+	if info.hProcess != 0 {
+		_, _ = windows.WaitForSingleObject(info.hProcess, 60000)
+		var code uint32
+		_ = windows.GetExitCodeProcess(info.hProcess, &code)
+		_ = windows.CloseHandle(info.hProcess)
+		if code != 0 {
+			return fmt.Errorf("the service did not start (exit code %d); see the VaultDock logs", code)
+		}
+	}
+	return nil
+}
+
+var procShellExecuteEx = windows.NewLazySystemDLL("shell32.dll").NewProc("ShellExecuteExW")
 
 // waitForParent waits (up to 15 s) for the process named by --wait-pid= to
 // exit.

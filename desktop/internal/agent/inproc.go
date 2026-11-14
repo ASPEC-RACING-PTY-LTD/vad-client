@@ -159,6 +159,26 @@ func (c *InProc) SetWindowVisible(ctx context.Context, visible bool) error {
 	return callErr(ctx, visible, c.api.SetWindowVisible)
 }
 
+func (c *InProc) LockStatus(ctx context.Context) (LockStatus, error) {
+	return call0(ctx, c.api.LockStatus)
+}
+
+func (c *InProc) SetupLock(ctx context.Context, req SetupLockRequest) error {
+	return callErr(ctx, req, c.api.SetupLock)
+}
+
+func (c *InProc) Unlock(ctx context.Context, req UnlockRequest) error {
+	return callErr(ctx, req, c.api.Unlock)
+}
+
+func (c *InProc) Lock(ctx context.Context) error {
+	return callErr(ctx, none{}, func(ctx context.Context, _ none) error { return c.api.Lock(ctx) })
+}
+
+func (c *InProc) SetHello(ctx context.Context, req HelloRequest) error {
+	return callErr(ctx, req, c.api.SetHello)
+}
+
 func (c *InProc) InstallUpdate(ctx context.Context) error {
 	return callErr(ctx, none{}, func(ctx context.Context, _ none) error { return c.api.InstallUpdate(ctx) })
 }

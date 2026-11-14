@@ -15,6 +15,7 @@ type Sample struct {
 	Disk       float64 // busiest disk: share of time it is working
 	GPU        float64 // 3D and compute engines
 	FullScreen bool    // a full-screen program (game, video, presentation) is in front
+	Game       string  // a running game (see GameName), "" when none
 	CPUs       int     // logical processors
 	RAMBytes   uint64  // installed physical memory
 }

@@ -16,7 +16,7 @@ import {
   OpenWebInterface,
   SetPaused,
 } from "../wailsjs/go/main/App";
-import type { agent, engine } from "../wailsjs/go/models";
+import type { agent, engine, main } from "../wailsjs/go/models";
 import { Badge, Button, cx, PageLoader, useUI } from "./ui";
 import { ConnectScreen } from "./screens/Connect";
 import { Overview } from "./screens/Overview";
@@ -25,6 +25,9 @@ import { AutomationsScreen } from "./screens/Automations";
 import { SettingsScreen } from "./screens/Settings";
 import { FirstRun, needsFirstRun } from "./screens/FirstRun";
 import { SyncScreen } from "./screens/Sync";
+import { ServiceDown } from "./screens/ServiceDown";
+import { LockScreen, SetupLock } from "./screens/Lock";
+import { GetAppLock } from "../wailsjs/go/main/App";
 import {
   enabledModules,
   modeLabel,
@@ -75,6 +78,8 @@ export function App() {
   const [snap, setSnap] = useState<engine.Snapshot | null>(null);
   const [tab, setTab] = useState<Tab | null>(null);
   const [revoked, setRevoked] = useState(false);
+  const [down, setDown] = useState(false);
+  const [lock, setLock] = useState<main.AppLock | null>(null);
   const [keys, setKeys] = useState<agent.KeyStatus | null>(null);
   const [setupLater, setSetupLater] = useState(false);
   const [forceSetup, setForceSetup] = useState(false);
@@ -91,7 +96,15 @@ export function App() {
       .catch(() => setKeys(null));
   }, []);
   const reload = useCallback(() => {
-    GetBootstrap().then(setBoot);
+    GetBootstrap()
+      .then((b) => {
+        setBoot(b);
+        setDown(false);
+      })
+      .catch(() => setDown(true));
+    GetAppLock()
+      .then(setLock)
+      .catch(() => setLock(null));
     reloadKeys();
   }, [reloadKeys]);
 
@@ -108,12 +121,19 @@ export function App() {
         reload();
       }),
       EventsOn("settings", reload),
+      EventsOn("agent-down", () => setDown(true)),
+      EventsOn("agent-up", reload),
+      EventsOn("locked", reload),
+      EventsOn("unlocked", reload),
       EventsOn("backup", reloadKeys),
     ];
     return () => offs.forEach((o) => o());
   }, [reload, reloadKeys]);
 
+  if (down) return <ServiceDown onUp={reload} />;
   if (!boot) return <PageLoader label="Starting VaultDock" />;
+  if (lock?.enabled && lock.locked) return <LockScreen lock={lock} onUnlocked={reload} />;
+  if (lock && !lock.enabled && boot.configured && !revoked && !boot.revoked) return <SetupLock onDone={reload} />;
 
   if (!boot.configured || revoked || boot.revoked) {
     return (

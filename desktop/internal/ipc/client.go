@@ -616,6 +616,26 @@ func (c *Client) CheckForUpdates(ctx context.Context) (updater.Status, error) {
 	return invoke[updater.Status](c, ctx, "CheckForUpdates", nil)
 }
 
+func (c *Client) LockStatus(ctx context.Context) (agent.LockStatus, error) {
+	return invoke[agent.LockStatus](c, ctx, "LockStatus", nil)
+}
+
+func (c *Client) SetupLock(ctx context.Context, req agent.SetupLockRequest) error {
+	return c.call(ctx, "SetupLock", req, nil)
+}
+
+func (c *Client) Unlock(ctx context.Context, req agent.UnlockRequest) error {
+	return c.call(ctx, "Unlock", req, nil)
+}
+
+func (c *Client) Lock(ctx context.Context) error {
+	return c.call(ctx, "Lock", nil, nil)
+}
+
+func (c *Client) SetHello(ctx context.Context, req agent.HelloRequest) error {
+	return c.call(ctx, "SetHello", req, nil)
+}
+
 func (c *Client) SetWindowVisible(ctx context.Context, visible bool) error {
 	return c.call(ctx, "SetWindowVisible", visible, nil)
 }

@@ -20,8 +20,13 @@ import (
 //     card is busy (games, AI), transfers keep to about 30% of the hardware
 //     ceiling and keep 30% spare;
 //   - when other programs leave almost nothing spare (95% processor or
-//     memory, 85% while gaming), no new file starts until it eases.
+//     memory, 85% while gaming), no new file starts until it eases;
+//   - while a game from a store or launcher runs (sysload.GameName), nothing
+//     transfers at all unless PauseForGames is off.
 type Governor struct {
+	// PauseForGames holds every transfer while a game runs.
+	PauseForGames bool
+
 	mu      sync.Mutex
 	ceiling float64
 	held    bool
@@ -36,6 +41,7 @@ type GovernorState struct {
 	Heavy    bool    `json:"heavy"`    // a game or other graphics work is running
 	Load     float64 `json:"load"`     // busiest of processor, memory and disk (0..1)
 	Reason   string  `json:"reason,omitempty"`
+	Game     string  `json:"game,omitempty"` // the running game transfers wait for
 }
 
 // HardwareCeiling is the most parallel transfers a machine gets: four per
@@ -89,6 +95,10 @@ func (g *Governor) Update(s sysload.Sample) GovernorState {
 	}
 	g.ceiling = max(1, min(g.ceiling, limit))
 	st.Ceiling, st.Held = int(g.ceiling), g.held
+	if s.Game != "" && g.PauseForGames {
+		st.Held, st.Game = true, s.Game
+		st.Reason = "paused while " + s.Game + " is running; transfers continue when it closes"
+	}
 	if heavy && st.Reason == "" {
 		st.Reason = "a game or other graphics work is running; transfers use less of the computer"
 	}

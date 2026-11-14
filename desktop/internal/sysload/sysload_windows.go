@@ -118,6 +118,7 @@ func (s *winSampler) Sample() Sample {
 		}
 	}
 	out.FullScreen = fullScreen()
+	out.Game = runningGame()
 	return out
 }
 

@@ -189,7 +189,7 @@ func (h *Host) syncIdle() bool {
 // asks the owner to stop the host.
 func (h *Host) requestInstall() error {
 	if h.serviceMode() {
-		return ErrUpdatesManaged
+		return h.serviceInstall()
 	}
 	u := h.updater()
 	if !u.Ready() {
@@ -205,6 +205,41 @@ func (h *Host) requestInstall() error {
 	h.mu.Unlock()
 	go h.opts.RequestExit()
 	return nil
+}
+
+// serviceInstall installs a verified update from the machine-wide service.
+// While someone has the app open it only tells them (the app installs it
+// with one administrator approval and reopens itself); with nobody using
+// it, the service runs the per-machine installer silently. The installer
+// stops this service and starts the new version.
+func (h *Host) serviceInstall() error {
+	u := h.updater()
+	if !u.Ready() {
+		return errors.New("no verified update is ready")
+	}
+	if h.bus.HasSubscribers(KindSnapshot) {
+		h.notifyReadyOnce(u.Status().Latest)
+		return nil
+	}
+	exe, err := os.Executable()
+	if err == nil {
+		exe, err = filepath.EvalSymlinks(exe)
+	}
+	if err != nil {
+		return err
+	}
+	h.log.Info("installing update from the service", "version", u.Status().Latest)
+	return u.Install(filepath.Dir(exe))
+}
+
+func (h *Host) notifyReadyOnce(v string) {
+	h.mu.Lock()
+	seen := v == "" || v == h.notifiedReady
+	h.notifiedReady = v
+	h.mu.Unlock()
+	if !seen {
+		h.notify("VaultDock "+v+" is ready to install", "Open VaultDock and choose Install update. It takes a few seconds and keeps all settings.", "info")
+	}
 }
 
 // launchPendingUpdate runs from Close, after the engine has stopped.

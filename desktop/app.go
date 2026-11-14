@@ -39,6 +39,8 @@ type App struct {
 	// localAutoStart: the agent does not manage this user's autostart
 	// (service mode), so the UI applies the setting to its own Run key.
 	localAutoStart bool
+	// agentMode is "service" or "in-process" (connectAgent).
+	agentMode string
 
 	mu         sync.Mutex
 	ctx        context.Context // Wails runtime context, set in startup
@@ -104,15 +106,35 @@ var bridgedKinds = []agent.EventKind{
 // bridgeEvents re-emits agent bus events as the Wails events the frontend
 // listens to: snapshot, connected / revoked / disconnected, enrollment,
 // settings and update. Notifications become Windows toasts.
+//
+// While the background service cannot be reached (still starting after
+// Windows starts, or stopped) it keeps trying, and tells the frontend
+// ("agent-up") once it can, so the window reloads.
 func (a *App) bridgeEvents() {
-	sub, err := a.api.Subscribe(a.bg, bridgedKinds...)
-	if err != nil {
-		a.log.Error("agent event subscription failed", "err", err)
-		return
-	}
-	defer sub.Close()
-	for ev := range sub.C() {
-		a.handleEvent(ev)
+	wait, down := time.Second, false
+	for {
+		sub, err := a.api.Subscribe(a.bg, bridgedKinds...)
+		if err == nil {
+			if down {
+				a.log.Info("background service reachable again")
+				a.emit("agent-up")
+			}
+			for ev := range sub.C() {
+				a.handleEvent(ev)
+			}
+			sub.Close()
+			wait = time.Second
+		} else if !down {
+			a.log.Warn("background service unreachable; retrying", "err", err)
+		}
+		down = true
+		a.emit("agent-down")
+		select {
+		case <-a.bg.Done():
+			return
+		case <-time.After(wait):
+		}
+		wait = min(2*wait, 10*time.Second)
 	}
 }
 

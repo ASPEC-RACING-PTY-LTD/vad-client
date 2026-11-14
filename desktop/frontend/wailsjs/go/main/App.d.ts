@@ -21,11 +21,17 @@ export function Connect(arg1:agent.ConnectRequest):Promise<agent.EnrollView>;
 
 export function DeleteConfig(arg1:string):Promise<void>;
 
+export function DisableHello():Promise<void>;
+
 export function Disconnect():Promise<void>;
 
 export function Elevation():Promise<main.Elevation>;
 
+export function EnableHello():Promise<void>;
+
 export function EncodeFolder(arg1:string):Promise<string>;
+
+export function GetAppLock():Promise<main.AppLock>;
 
 export function GetBootstrap():Promise<agent.Bootstrap>;
 
@@ -62,6 +68,8 @@ export function ListHistory(arg1:string):Promise<Array<state.HistoryEntry>>;
 export function ListIssues(arg1:agent.IssueQuery):Promise<Array<agent.BackupIssue>>;
 
 export function ListQueue(arg1:string):Promise<Array<state.Item>>;
+
+export function LockNow():Promise<void>;
 
 export function ModeTexts():Promise<Record<string, string>>;
 
@@ -105,12 +113,22 @@ export function SaveConfig(arg1:config.SyncConfig):Promise<config.SyncConfig>;
 
 export function SaveSettings(arg1:config.Settings):Promise<config.Settings>;
 
+export function ServiceHealth():Promise<main.ServiceHealth>;
+
 export function SetPaused(arg1:boolean):Promise<void>;
+
+export function SetupAppLock(arg1:string,arg2:string):Promise<void>;
 
 export function ShowWindow():Promise<void>;
 
 export function SkipIssues(arg1:number,arg2:Array<number>,arg3:Array<string>):Promise<void>;
 
+export function StartService():Promise<void>;
+
 export function SuggestFolders():Promise<Record<string, string>>;
 
 export function SyncNow(arg1:string):Promise<void>;
+
+export function UnlockWithHello():Promise<void>;
+
+export function UnlockWithPIN(arg1:string):Promise<void>;

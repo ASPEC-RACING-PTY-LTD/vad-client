@@ -24,6 +24,10 @@ Version: set `info.productVersion` in `desktop/wails.json` and `-X main.version`
 - **Start with Windows** (default on after connecting) adds `HKCU\...\Run\VaultDock` with `--minimized`.
 - Single instance: launching it again shows the existing window.
 - Settings: parallel transfers (automatic with an upper limit, or fixed), bandwidth limit, notifications.
+- **App lock**: the device key is sealed with a key unlocked by a 6-digit PIN (Argon2id; after 5 wrong tries each further one doubles a wait, up to 30 minutes) or, optionally, Windows Hello (an RSA key in the user's Hello container; the agent only ever gets its public key). VaultDock starts locked after every Windows start, restart and update and syncs nothing until it is unlocked. Existing installs are asked to set a PIN once. Tray: **Lock VaultDock**; Settings: change PIN, Windows Hello, Lock now.
+- **Pause while playing games** (on by default): while a game from Steam, Epic Games, Ubisoft Connect, EA, GOG, Battle.net, Xbox, Riot, Rockstar, Amazon Games or itch runs (its program is inside a launcher's game library), transfers stop and go back to the queue and scheduled backups wait; everything continues when the game closes.
+- **Background service**: with the per-machine install the app always uses the VaultDockAgent service. While it is still starting (after Windows starts) or stopped, the app waits for it and shows why (stopped, or its program missing, for example quarantined by antivirus) instead of starting a separate agent with its own settings.
+- **Antivirus**: the agent program carries publisher and version information, and every downloaded update installer is checked by the PC's antivirus through the Windows Antimalware Scan Interface (AMSI: Microsoft Defender, Malwarebytes and other registered products) before it runs.
 
 ## Data on the PC
 
@@ -44,6 +48,7 @@ The app keeps itself up to date from the GitHub releases of `ASPEC-RACING-PTY-LT
 - A newer installer is downloaded only over HTTPS from `github.com` (redirects are limited to GitHub's asset hosts), into `%LOCALAPPDATA%\VaultDock\updates`.
 - The download is verified against the SHA-256 digest GitHub publishes for the asset, or the release's `SHA256SUMS` file. A release without a checksum is never installed. The file is hashed again immediately before it runs.
 - With **Install updates automatically** on (the default), the update is installed once nothing is uploading. Otherwise Settings shows **Install and restart**.
+- With the VaultDockAgent service, the service checks for, downloads and verifies updates itself. While nobody uses the app it installs them silently; while the app is open it shows **VaultDock x.y.z is ready to install**, and **Install update** runs the installer with one administrator approval and reopens the app.
 - Installing stops the sync engine cleanly, then runs the installer silently (`/S /RELAUNCH /D=<current folder>`). It replaces the app in place and starts it again in the notification area. Settings, the device key and sync state are kept.
 
 Development builds (version `dev`) never update themselves.

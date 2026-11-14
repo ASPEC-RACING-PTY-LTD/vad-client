@@ -20,6 +20,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/avscan"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/release"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/version"
 )
@@ -293,6 +294,19 @@ func (u *Updater) Install(installDir string) error {
 	}
 	if installDir == "" || strings.ContainsAny(installDir, "\"\r\n") {
 		return fmt.Errorf("invalid install directory %q", installDir)
+	}
+	// The installer matched the published checksum above; the antivirus on
+	// this PC (AMSI: Defender, Malwarebytes, ...) also checks it before it
+	// runs.
+	if v, err := avscan.Check(path, filepath.Base(path)); err != nil {
+		u.mu.Lock()
+		u.readyAt = ""
+		u.mu.Unlock()
+		u.set(func(s *Status) { s.State, s.Error = StateError, err.Error() })
+		u.Log.Error("update installer refused by the antivirus", "path", path, "verdict", v.String())
+		return err
+	} else {
+		u.Log.Info("update installer checked by the antivirus", "verdict", v.String())
 	}
 	// NSIS: /S silent, /D= must be last and unquoted.
 	args := "/S /RELAUNCH /D=" + installDir

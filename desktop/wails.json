@@ -11,10 +11,10 @@
     "email": "vaultdock@example.invalid"
   },
   "info": {
-    "companyName": "VaultDock",
+    "companyName": "ASPEC Racing Pty Ltd",
     "productName": "VaultDock",
     "productVersion": "0.1.0",
-    "copyright": "VaultDock contributors",
+    "copyright": "Copyright 2026 ASPEC Racing Pty Ltd",
     "comments": "Self-hosted file storage and intelligent synchronisation"
   },
   "nsisType": "single",

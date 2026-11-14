@@ -25,6 +25,7 @@ import (
 	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/engine"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/ipc"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/platform"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/service"
 )
 
 //go:embed all:frontend/dist
@@ -72,6 +73,7 @@ func main() {
 
 	app := NewApp(log, ag.api)
 	app.localAutoStart = ag.mode == "service"
+	app.agentMode = ag.mode
 	app.toasts = newToasts(log)
 	appRef.Store(app)
 
@@ -86,15 +88,15 @@ func main() {
 	app.onSettings = func(s config.Settings) { tray.update() }
 
 	err = wails.Run(&options.App{
-		Title:             "VaultDock",
-		Width:             1180,
-		Height:            760,
-		MinWidth:          920,
-		MinHeight:         600,
-		StartHidden:       startHidden,
+		Title:       "VaultDock",
+		Width:       1180,
+		Height:      760,
+		MinWidth:    920,
+		MinHeight:   600,
+		StartHidden: startHidden,
 		// Frameless: the UI draws its own title bar (TitleBar.tsx); Windows 11
 		// still adds the shadow, rounded corners and snap layouts.
-		Frameless: true,
+		Frameless:         true,
 		HideWindowOnClose: settings.CloseToTray,
 		BackgroundColour:  &options.RGBA{R: 16, G: 16, B: 18, A: 255},
 		AssetServer:       &assetserver.Options{Assets: assets},
@@ -153,6 +155,21 @@ func connectAgent(log *slog.Logger, quit func()) (*agentConn, error) {
 	if err == nil {
 		log.Info("agent mode: service", "pipe", ipc.PipeName)
 		return &agentConn{api: c, mode: "service", close: sync.OnceFunc(func() { _ = c.Close() })}, nil
+	}
+	// With the service installed the app always uses it, even while it is
+	// still starting (after Windows starts) or stopped: a separate agent in
+	// this process would have its own empty settings, ask to connect again
+	// and register this PC as a new device. The client reconnects by itself
+	// and the window shows the service's state meanwhile.
+	if os.Getenv(platform.EnvDataDir) == "" && serviceInstalled() {
+		log.Warn("agent service not reachable yet; waiting for it", "err", err)
+		if st, qerr := service.Query(service.DefaultName); qerr == nil && st.State == "stopped" {
+			if serr := service.StartService(service.DefaultName); serr != nil {
+				log.Info("could not start the agent service without elevation", "err", serr)
+			}
+		}
+		lc := ipc.NewClient(opts)
+		return &agentConn{api: lc, mode: "service", close: sync.OnceFunc(func() { _ = lc.Close() })}, nil
 	}
 	log.Info("agent mode: in-process", "reason", err.Error())
 	api, stop, err := newInProcAgent(context.Background(), log, quit)
@@ -218,6 +235,8 @@ func (t *trayController) onReady() {
 	})
 	web := systray.AddMenuItem("Open web interface", "Open VaultDock in your browser")
 	web.Click(func() { t.app.OpenWebInterface("/") })
+	lock := systray.AddMenuItem("Lock VaultDock", "Lock until unlocked with your PIN or Windows Hello")
+	lock.Click(func() { _ = t.app.LockNow() })
 	systray.AddSeparator()
 	quitTip := "Stop synchronising and exit"
 	if t.service {

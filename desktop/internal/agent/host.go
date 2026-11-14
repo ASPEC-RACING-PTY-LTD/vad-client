@@ -141,12 +141,16 @@ func (f FileKeyStore) Delete() error {
 // device identity and updater. Create with NewHost, then Start; Close stops
 // everything.
 type Host struct {
-	opts      Options
-	log       *slog.Logger
-	bus       *Bus
-	st        *state.Store
-	ownsStore bool
-	eng       *engine.Engine
+	opts Options
+	lock *appLock // the app lock (PIN / Windows Hello)
+	// notifiedReady is the update version the user was told is ready.
+	notifiedReady string
+	plainKeys     KeyStore // the device key store before an app lock is set
+	log           *slog.Logger
+	bus           *Bus
+	st            *state.Store
+	ownsStore     bool
+	eng           *engine.Engine
 
 	mu             sync.Mutex
 	settings       config.Settings
@@ -228,7 +232,13 @@ func NewHost(opts Options) (*Host, error) {
 	if err := os.MkdirAll(opts.DataDir, 0o700); err != nil {
 		return nil, err
 	}
-	h := &Host{opts: opts, bus: NewBus(opts.EventBuffer), settings: config.DefaultSettings(), directKick: make(chan struct{}, 1)}
+	lock, err := openAppLock(filepath.Join(opts.DataDir, "applock.dat"))
+	if err != nil {
+		return nil, err
+	}
+	plain := opts.Keys
+	opts.Keys = lockedKeys{inner: plain, lock: lock}
+	h := &Host{opts: opts, bus: NewBus(opts.EventBuffer), settings: config.DefaultSettings(), directKick: make(chan struct{}, 1), lock: lock, plainKeys: plain}
 	h.log = slog.New(NewLogHandler(h.bus, opts.Log.Handler(), opts.LogEventLevel))
 	h.ctx, h.cancel = context.WithCancel(context.Background())
 	if raw, err := os.ReadFile(h.path("settings.json")); err == nil {
@@ -417,6 +427,11 @@ func (h *Host) restoreConnection() {
 		return
 	}
 	key, err := h.opts.Keys.Load()
+	if errors.Is(err, ErrLocked) {
+		h.log.Info("app locked; waiting for the PIN or Windows Hello")
+		h.setConnection("locked")
+		return
+	}
 	if err != nil {
 		h.log.Warn("device key unavailable; reconnect required", "err", err)
 		return
@@ -472,6 +487,7 @@ func (h *Host) Bootstrap(ctx context.Context) (Bootstrap, error) {
 		Version: engine.Version, ProtocolVersion: ProtocolVersion, Settings: h.settings,
 		DeviceName: h.opts.DeviceName, OS: h.opts.OS, User: h.settings.Username,
 		Configured: h.settings.DeviceID != 0, Connected: h.client != nil, Revoked: h.revoked,
+		Lock: h.lock.status(),
 	}
 	if h.enroll != nil {
 		v := h.enroll.view
@@ -527,6 +543,9 @@ func friendlyNetErr(err error) error {
 func (h *Host) Connect(ctx context.Context, req ConnectRequest) (EnrollView, error) {
 	if err := h.live(); err != nil {
 		return EnrollView{}, err
+	}
+	if h.lock.locked() {
+		return EnrollView{}, ErrLocked
 	}
 	base, err := client.NormalizeURL(req.URL)
 	if err != nil {
@@ -682,6 +701,9 @@ func (h *Host) CancelEnrollment(ctx context.Context) error {
 func (h *Host) Disconnect(ctx context.Context) error {
 	if err := h.live(); err != nil {
 		return err
+	}
+	if h.lock.locked() {
+		return ErrLocked
 	}
 	h.mu.Lock()
 	h.client, h.me = nil, nil

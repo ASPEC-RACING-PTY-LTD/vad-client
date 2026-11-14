@@ -264,10 +264,12 @@ func runAgent(cl cmdLine) error {
 // machine-wide service (the host then refuses per-user update installs).
 func agentOptions(cl cmdLine, log *slog.Logger, isSvc bool) agent.Options {
 	o := agent.Options{
-		Log:         log,
-		DataDir:     cl.dataDir,
-		UpdateRepo:  updateRepo,
-		AutoUpdates: cl.autoUpdates,
+		Log:        log,
+		DataDir:    cl.dataDir,
+		UpdateRepo: updateRepo,
+		// The service checks for, downloads and verifies updates itself; it
+		// installs them while nobody is using the app (agent.serviceInstall).
+		AutoUpdates: cl.autoUpdates || isSvc,
 		Service:     isSvc,
 	}
 	if isSvc {

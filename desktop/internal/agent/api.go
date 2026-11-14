@@ -98,6 +98,18 @@ type API interface {
 	// hourly while it is, and at most every six hours otherwise.
 	SetWindowVisible(ctx context.Context, visible bool) error
 
+	// --- app lock (PIN / Windows Hello) ---
+
+	LockStatus(ctx context.Context) (LockStatus, error)
+	// SetupLock sets or changes the 6-digit PIN.
+	SetupLock(ctx context.Context, req SetupLockRequest) error
+	// Unlock opens the app lock (PIN, or the key from Windows Hello).
+	Unlock(ctx context.Context, req UnlockRequest) error
+	// Lock locks the app now.
+	Lock(ctx context.Context) error
+	// SetHello stores or removes the Windows Hello unlock.
+	SetHello(ctx context.Context, req HelloRequest) error
+
 	// --- events ---
 
 	// Subscribe returns a stream of events of the given kinds (all kinds
@@ -175,6 +187,7 @@ type Bootstrap struct {
 	OS              string          `json:"os"`
 	User            string          `json:"user"`
 	ServerInfo      *ServerInfo     `json:"server_info"`
+	Lock            LockStatus      `json:"lock"`
 }
 
 // ServerInfo summarises the connected server and account.

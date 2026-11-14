@@ -105,6 +105,7 @@ type Engine struct {
 	sampler  sysload.Sampler // created by the timer loop
 	manual   atomic.Bool     // a fixed number of transfers is in force
 	held     atomic.Bool     // the computer is busy: no new file starts
+	game     atomicString    // a running game everything waits for
 
 	checking  atomic.Bool  // a deferred-upload check is running
 	lastCheck atomic.Int64 // unix ms of the last one

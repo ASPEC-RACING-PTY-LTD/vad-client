@@ -25,6 +25,9 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/tc-hib/winres"
+	wrversion "github.com/tc-hib/winres/version"
 )
 
 const desktopModule = "module github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop"
@@ -63,9 +66,20 @@ func run() error {
 		return fmt.Errorf("invalid version %q", version)
 	}
 
+	// Version information, icon and manifest: Windows and antivirus
+	// products show and weigh who made a program and what it is; a service
+	// binary without them looks like an anonymous dropper.
+	syso := filepath.Join(root, "cmd", "vaultdock-agent", "rsrc_windows_"+arch+".syso")
+	if err := writeResources(root, syso, arch, version); err != nil {
+		return fmt.Errorf("agent resources: %w", err)
+	}
+	defer os.Remove(syso)
+
 	out := filepath.Join(root, "build", "windows", "installer", "payload", arch, "vaultdock-agent.exe")
+	// Symbols are kept (no -s -w): stripped binaries are a common heuristic
+	// signal for antivirus scanners.
 	cmd := exec.Command("go", "build", "-trimpath",
-		"-ldflags", "-s -w -X main.version="+version,
+		"-ldflags", "-X main.version="+version,
 		"-o", out, "./cmd/vaultdock-agent")
 	cmd.Dir = root
 	cmd.Env = append(os.Environ(), "GOOS=windows", "GOARCH="+arch)
@@ -75,6 +89,63 @@ func run() error {
 	}
 	fmt.Printf("built %s (version %s)\n", out, version)
 	return nil
+}
+
+// writeResources writes the agent's Windows resources (version information,
+// icon, asInvoker manifest) as a .syso object that go build links in.
+func writeResources(root, out, arch, ver string) error {
+	rs := &winres.ResourceSet{}
+	f, err := os.Open(filepath.Join(root, "build", "windows", "icon.ico"))
+	if err != nil {
+		return err
+	}
+	icon, err := winres.LoadICO(f)
+	f.Close()
+	if err != nil {
+		return err
+	}
+	if err := rs.SetIcon(winres.Name("APPICON"), icon); err != nil {
+		return err
+	}
+	vi := wrversion.Info{}
+	vi.SetFileVersion(ver)
+	vi.SetProductVersion(ver)
+	for k, v := range map[string]string{
+		wrversion.CompanyName:      "ASPEC Racing Pty Ltd",
+		wrversion.ProductName:      "VaultDock",
+		wrversion.FileDescription:  "VaultDock background service (backup and sync agent)",
+		wrversion.InternalName:     "vaultdock-agent",
+		wrversion.OriginalFilename: "vaultdock-agent.exe",
+		wrversion.LegalCopyright:   "Copyright 2026 ASPEC Racing Pty Ltd",
+		wrversion.Comments:         "Self-hosted file storage and synchronisation",
+		wrversion.ProductVersion:   ver,
+		wrversion.FileVersion:      ver,
+	} {
+		if err := vi.Set(wrversion.LangDefault, k, v); err != nil {
+			return err
+		}
+	}
+	rs.SetVersionInfo(vi)
+	rs.SetManifest(winres.AppManifest{
+		Identity:       winres.AssemblyIdentity{Name: "VaultDock.Agent"},
+		Description:    "VaultDock background service",
+		ExecutionLevel: winres.AsInvoker,
+		Compatibility:  winres.Win10AndAbove,
+		LongPathAware:  true,
+	})
+	w, err := os.Create(out)
+	if err != nil {
+		return err
+	}
+	a := winres.ArchAMD64
+	if arch == "arm64" {
+		a = winres.ArchARM64
+	}
+	if err := rs.WriteObject(w, a); err != nil {
+		w.Close()
+		return err
+	}
+	return w.Close()
 }
 
 // desktopRoot walks up from the working directory to the desktop module.

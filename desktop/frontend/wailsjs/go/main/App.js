@@ -30,6 +30,10 @@ export function DeleteConfig(arg1) {
   return window['go']['main']['App']['DeleteConfig'](arg1);
 }
 
+export function DisableHello() {
+  return window['go']['main']['App']['DisableHello']();
+}
+
 export function Disconnect() {
   return window['go']['main']['App']['Disconnect']();
 }
@@ -38,8 +42,16 @@ export function Elevation() {
   return window['go']['main']['App']['Elevation']();
 }
 
+export function EnableHello() {
+  return window['go']['main']['App']['EnableHello']();
+}
+
 export function EncodeFolder(arg1) {
   return window['go']['main']['App']['EncodeFolder'](arg1);
+}
+
+export function GetAppLock() {
+  return window['go']['main']['App']['GetAppLock']();
 }
 
 export function GetBootstrap() {
@@ -112,6 +124,10 @@ export function ListIssues(arg1) {
 
 export function ListQueue(arg1) {
   return window['go']['main']['App']['ListQueue'](arg1);
+}
+
+export function LockNow() {
+  return window['go']['main']['App']['LockNow']();
 }
 
 export function ModeTexts() {
@@ -198,8 +214,16 @@ export function SaveSettings(arg1) {
   return window['go']['main']['App']['SaveSettings'](arg1);
 }
 
+export function ServiceHealth() {
+  return window['go']['main']['App']['ServiceHealth']();
+}
+
 export function SetPaused(arg1) {
   return window['go']['main']['App']['SetPaused'](arg1);
+}
+
+export function SetupAppLock(arg1, arg2) {
+  return window['go']['main']['App']['SetupAppLock'](arg1, arg2);
 }
 
 export function ShowWindow() {
@@ -210,10 +234,22 @@ export function SkipIssues(arg1, arg2, arg3) {
   return window['go']['main']['App']['SkipIssues'](arg1, arg2, arg3);
 }
 
+export function StartService() {
+  return window['go']['main']['App']['StartService']();
+}
+
 export function SuggestFolders() {
   return window['go']['main']['App']['SuggestFolders']();
 }
 
 export function SyncNow(arg1) {
   return window['go']['main']['App']['SyncNow'](arg1);
+}
+
+export function UnlockWithHello() {
+  return window['go']['main']['App']['UnlockWithHello']();
+}
+
+export function UnlockWithPIN(arg1) {
+  return window['go']['main']['App']['UnlockWithPIN'](arg1);
 }

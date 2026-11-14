@@ -278,8 +278,10 @@ func TestInstallUpdateRefusedInServiceMode(t *testing.T) {
 				t.Fatalf("InstallUpdate = %v, want %v", err, ErrUpdatesManaged)
 			}
 		}
-		if err := h.requestInstall(); !errors.Is(err, ErrUpdatesManaged) {
-			t.Fatalf("requestInstall (auto-update path) = %v", err)
+		// The service's own automatic path never installs without a
+		// verified download.
+		if err := h.requestInstall(); err == nil || errors.Is(err, ErrUpdatesManaged) {
+			t.Fatalf("requestInstall (auto-update path) without a download = %v", err)
 		}
 	})
 	t.Run("process is LocalSystem", func(t *testing.T) {

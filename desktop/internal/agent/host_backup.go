@@ -444,6 +444,15 @@ func (h *Host) runLoops(s *backupStack) {
 	defer cancel()
 	cfg := s.runner.SchedulerConfig()
 	cfg.Trigger = func(_ context.Context, jobID int64, trigger string) error {
+		// Scheduled backups wait while a game runs (Settings.SyncDuringGames).
+		for g := h.eng.Gaming(); g != ""; g = h.eng.Gaming() {
+			h.log.Info("scheduled backup waits for a game to close", "job", jobID, "game", g)
+			select {
+			case <-s.ctx.Done():
+				return s.ctx.Err()
+			case <-time.After(30 * time.Second):
+			}
+		}
 		return s.runner.Trigger(s.ctx, jobID, trigger)
 	}
 	cfg.DeviceID = strconv.FormatInt(s.c.DeviceID, 10)
