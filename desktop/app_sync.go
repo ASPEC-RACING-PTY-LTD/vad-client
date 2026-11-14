@@ -67,6 +67,12 @@ func (a *App) GetSnapshot() (engine.Snapshot, error) { return a.api.Snapshot(a.b
 
 func (a *App) SetPaused(p bool) error { return uiError(a.api.SetPaused(a.bg, p)) }
 
+// ClearTransfers stops the transfers in progress and starts them again.
+func (a *App) ClearTransfers() (int64, error) {
+	n, err := a.api.ClearTransfers(a.bg)
+	return n, uiError(err)
+}
+
 // ResetSyncData forgets what was uploaded and rescans, so everything is
 // uploaded again (for example after the server was set up fresh).
 func (a *App) ResetSyncData() (int64, error) { return a.api.ResetSyncData(a.bg) }

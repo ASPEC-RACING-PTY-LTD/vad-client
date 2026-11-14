@@ -10,6 +10,10 @@ export function CheckForUpdates() {
   return window['go']['main']['App']['CheckForUpdates']();
 }
 
+export function ClearTransfers() {
+  return window['go']['main']['App']['ClearTransfers']();
+}
+
 export function CloseWindow() {
   return window['go']['main']['App']['CloseWindow']();
 }

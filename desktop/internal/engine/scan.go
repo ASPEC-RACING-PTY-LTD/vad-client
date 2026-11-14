@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -15,6 +16,7 @@ import (
 	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/filter"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-client/desktop/internal/state"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/automation"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/client"
 )
 
 func toSlash(p string) string { return strings.ReplaceAll(p, `\`, "/") }
@@ -110,7 +112,16 @@ func (e *Engine) Scan(cfgID string, manual bool) (int, error) {
 	for _, old := range renamedFrom {
 		renamedTo[old] = true
 	}
+	// Files this PC has no record of (a new sync folder, or after Reset sync
+	// data) that the account already stores are recorded as synced, never
+	// queued or uploaded again.
+	stored := e.alreadyStored(w.hits, index, renamedFrom)
 	for _, h := range w.hits {
+		if stored[h.rel] {
+			_ = e.st.PutFile(state.FileEntry{ConfigID: cfgID, RelPath: h.rel, Size: h.fi.Size(), MTime: h.fi.ModTime().UnixNano(), Status: "synced", Reason: "already on the server"})
+			e.st.RemoveQueued(cfgID, h.rel)
+			continue
+		}
 		if h.probe != nil {
 			skipped(h.rel, h.probe)
 			if classifyIssue(h.probe) != issueLocked {
@@ -299,6 +310,46 @@ func (e *Engine) collect(cfg *config.SyncConfig, flt *filter.Filter, index map[s
 		}
 	}
 	return w
+}
+
+// alreadyStored asks the server which of the files this PC has no record of
+// it already stores (same name, size and modification time). Any failure
+// (offline, an older server) answers "none", so files are queued as usual.
+func (e *Engine) alreadyStored(hits []scanHit, index map[string]state.FileEntry, renamed map[string]string) map[string]bool {
+	out := map[string]bool{}
+	c := e.getClient()
+	if c == nil {
+		return out
+	}
+	var cand []scanHit
+	for _, h := range hits {
+		if _, known := index[h.rel]; !known && renamed[h.rel] == "" {
+			cand = append(cand, h)
+		}
+	}
+	for start := 0; start < len(cand); start += 1000 {
+		batch := cand[start:min(start+1000, len(cand))]
+		files := make([]client.KnownFile, len(batch))
+		for i, h := range batch {
+			files[i] = client.KnownFile{Name: path.Base(h.rel), Size: h.fi.Size(), ModifiedAt: h.fi.ModTime().UnixMilli()}
+		}
+		ctx, cancel := context.WithTimeout(e.ctx, 30*time.Second)
+		known, err := c.KnownFiles(ctx, files)
+		cancel()
+		if err != nil {
+			e.log.Info("could not ask the server which files it already has; queueing them", "files", len(cand), "err", err)
+			return out
+		}
+		for i, k := range known {
+			if k {
+				out[batch[i].rel] = true
+			}
+		}
+	}
+	if len(out) > 0 {
+		e.log.Info("files already on the server recorded as synced", "files", len(out))
+	}
+	return out
 }
 
 // ownerMessage is the configuration status text for an owner error.

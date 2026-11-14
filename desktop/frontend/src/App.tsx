@@ -4,6 +4,7 @@ import {
   Globe,
   LayoutDashboard,
   Pause,
+  RotateCcw,
   Play,
   Settings as SettingsIcon,
 } from "lucide-react";
@@ -13,6 +14,7 @@ import {
   KeyStatus,
   OpenWebInterface,
   SetPaused,
+  ClearTransfers,
 } from "../wailsjs/go/main/App";
 import type { agent, engine, main } from "../wailsjs/go/models";
 import { Badge, Button, cx, PageLoader, useUI } from "./ui";
@@ -126,8 +128,10 @@ export function App() {
 
   if (down) return <ServiceDown onUp={reload} />;
   if (!boot) return <PageLoader label="Starting VaultDock" />;
-  if (lock?.enabled && lock.locked) return <LockScreen lock={lock} onUnlocked={reload} />;
-  if (lock && !lock.enabled && boot.configured && !revoked && !boot.revoked) return <SetupLock onDone={reload} />;
+  if (lock?.enabled && lock.locked)
+    return <LockScreen lock={lock} onUnlocked={reload} />;
+  if (lock && !lock.enabled && boot.configured && !revoked && !boot.revoked)
+    return <SetupLock onDone={reload} />;
 
   if (!boot.configured || revoked || boot.revoked) {
     return (
@@ -257,7 +261,29 @@ export function App() {
               {boot.settings.server_url}
             </span>
           )}
-          <div className="ml-auto">
+          <div className="ml-auto flex gap-2">
+            {syncOn && (snap?.active.length ?? 0) > 0 && (
+              <Button
+                size="sm"
+                icon={<RotateCcw className="size-3.5" />}
+                title="Stop the transfers in progress and start them again from the beginning"
+                onClick={() =>
+                  ClearTransfers()
+                    .then((n) =>
+                      toast(
+                        "info",
+                        `Restarting ${n} transfer(s)`,
+                        "They start again from the beginning.",
+                      ),
+                    )
+                    .catch((e) =>
+                      toast("error", "Could not clear", apiMessage(e)),
+                    )
+                }
+              >
+                Clear
+              </Button>
+            )}
             {!syncOn ? null : snap?.paused ? (
               <Button
                 size="sm"
@@ -332,11 +358,7 @@ export function App() {
             />
           )}
           {current === "settings" && (
-            <SettingsScreen
-              boot={boot}
-              snap={snap}
-              onChanged={reload}
-            />
+            <SettingsScreen boot={boot} snap={snap} onChanged={reload} />
           )}
         </main>
       </div>

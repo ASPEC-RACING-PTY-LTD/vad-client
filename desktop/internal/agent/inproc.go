@@ -111,6 +111,10 @@ func (c *InProc) Snapshot(ctx context.Context) (engine.Snapshot, error) {
 	return call0(ctx, c.api.Snapshot)
 }
 
+func (c *InProc) ClearTransfers(ctx context.Context) (int64, error) {
+	return call0(ctx, c.api.ClearTransfers)
+}
+
 func (c *InProc) SetPaused(ctx context.Context, paused bool) error {
 	return callErr(ctx, paused, c.api.SetPaused)
 }

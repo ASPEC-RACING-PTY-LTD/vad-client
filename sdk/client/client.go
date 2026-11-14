@@ -557,6 +557,29 @@ func (c *Client) Notify(ctx context.Context, items []NotificationReport) error {
 	return c.Call(ctx, "POST", "/api/v1/device/notifications", map[string]any{"notifications": items}, nil)
 }
 
+// KnownFile describes a local file for KnownFiles.
+type KnownFile struct {
+	Name       string `json:"name"`
+	Size       int64  `json:"size"`
+	ModifiedAt int64  `json:"modified_at"` // unix ms
+}
+
+// KnownFiles asks which files the account already stores (same name, size
+// and modification time, in any folder); the result is in the same order.
+// At most 1000 files per call.
+func (c *Client) KnownFiles(ctx context.Context, files []KnownFile) ([]bool, error) {
+	var out struct {
+		Known []bool `json:"known"`
+	}
+	if err := c.Call(ctx, "POST", "/api/v1/uploads/known", map[string]any{"files": files}, &out); err != nil {
+		return nil, err
+	}
+	if len(out.Known) != len(files) {
+		return nil, fmt.Errorf("known files: %d answers for %d files", len(out.Known), len(files))
+	}
+	return out.Known, nil
+}
+
 // --- response helpers ---
 
 // apiPath joins the /api/v1 prefix, a path and an optional query.

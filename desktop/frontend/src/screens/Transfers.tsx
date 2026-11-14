@@ -95,7 +95,10 @@ export function TransfersCard({ snap }: { snap: engine.Snapshot | null }) {
               <span className="min-w-0 flex-1 truncate text-sm" title={r.path}>
                 {r.path}
               </span>
-              <ProgressBar value={r.progress} indeterminate={r.busy} className={r.finishing ? 'h-1.5 w-28 shrink-0 animate-pulse' : 'h-1.5 w-28 shrink-0'} />
+              {/* ProgressBar is full width: the wrapper sets its size so the name keeps its room. */}
+              <div className="w-28 shrink-0">
+                <ProgressBar value={r.progress} indeterminate={r.busy} className={r.finishing ? 'h-1.5 animate-pulse' : 'h-1.5'} />
+              </div>
               <span className="w-52 shrink-0 truncate text-right text-xs text-slate-500 tabular-nums">{r.detail}</span>
             </div>
           ))}

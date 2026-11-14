@@ -84,6 +84,7 @@ var handlers = map[string]handler{
 	"PreviewConfig":      m1(agent.API.PreviewConfig),
 	"Snapshot":           m0(agent.API.Snapshot),
 	"SetPaused":          e1(agent.API.SetPaused),
+	"ClearTransfers":     m0(agent.API.ClearTransfers),
 	"RetryFailed":        m1(agent.API.RetryFailed),
 	"ResetSyncData":      m0(agent.API.ResetSyncData),
 	"ListQueue":          m1(agent.API.ListQueue),

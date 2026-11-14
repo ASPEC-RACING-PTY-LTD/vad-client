@@ -105,6 +105,7 @@ type Engine struct {
 	sampler  sysload.Sampler // created by the timer loop
 	manual   atomic.Bool     // a fixed number of transfers is in force
 	held     atomic.Bool     // the computer is busy: no new file starts
+	clearing atomic.Bool     // ClearTransfers is restarting the transfers
 	game     atomicString    // a running game everything waits for
 
 	checking  atomic.Bool  // a deferred-upload check is running
@@ -445,6 +446,43 @@ func (e *Engine) SetPaused(p bool) {
 	e.mu.Unlock()
 	e.refreshStatus()
 	e.kick()
+}
+
+// ClearTransfers stops every transfer in progress and starts them again
+// from the beginning: their server upload sessions are discarded and the
+// files go back to the queue. Returns how many were stopped.
+func (e *Engine) ClearTransfers(ctx context.Context) int {
+	e.clearing.Store(true)
+	defer func() {
+		e.clearing.Store(false)
+		e.refreshStatus()
+		e.kick()
+	}()
+	e.mu.Lock()
+	c := e.client
+	var ids []string
+	n := 0
+	for _, at := range e.active {
+		if id, _ := at.uploadID.Load().(string); id != "" {
+			ids = append(ids, id)
+		}
+		if at.cancel != nil {
+			at.cancel()
+			n++
+		}
+	}
+	e.mu.Unlock()
+	if c != nil {
+		ctx, cancel := context.WithTimeout(ctx, time.Minute)
+		defer cancel()
+		for _, id := range ids {
+			if err := c.RestartUpload(ctx, id); err != nil {
+				e.log.Warn("could not discard an upload session; the server expires it", "upload", id, "err", err)
+			}
+		}
+	}
+	e.log.Info("transfers cleared and restarted", "stopped", n)
+	return n
 }
 
 func (e *Engine) Paused() bool {

@@ -865,6 +865,13 @@ func (h *Host) Snapshot(ctx context.Context) (engine.Snapshot, error) {
 	return h.filterSnapshot(h.scopeOf(ctx), h.eng.Snapshot()), nil
 }
 
+func (h *Host) ClearTransfers(ctx context.Context) (int64, error) {
+	if err := h.live(); err != nil {
+		return 0, err
+	}
+	return int64(h.eng.ClearTransfers(ctx)), nil
+}
+
 func (h *Host) SetPaused(ctx context.Context, paused bool) error {
 	if err := h.live(); err != nil {
 		return err

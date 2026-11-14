@@ -572,6 +572,10 @@ func (c *Client) Snapshot(ctx context.Context) (engine.Snapshot, error) {
 	return invoke[engine.Snapshot](c, ctx, "Snapshot", nil)
 }
 
+func (c *Client) ClearTransfers(ctx context.Context) (int64, error) {
+	return invoke[int64](c, ctx, "ClearTransfers", nil)
+}
+
 func (c *Client) SetPaused(ctx context.Context, paused bool) error {
 	return c.call(ctx, "SetPaused", paused, nil)
 }

@@ -99,6 +99,7 @@ var methodAccess = map[string]Access{
 	"Disconnect":       AccessUser,
 	"SaveSettings":     AccessUser,
 	"SetPaused":        AccessUser,
+	"ClearTransfers":   AccessUser,
 	"CheckForUpdates":  AccessUser,
 	"InstallUpdate":    AccessUser,
 	"SetWindowVisible": AccessUser,

@@ -11,6 +11,8 @@ export function CancelEnrollment():Promise<void>;
 
 export function CheckForUpdates():Promise<updater.Status>;
 
+export function ClearTransfers():Promise<number>;
+
 export function CloseWindow():Promise<void>;
 
 export function ConfirmRecoveryKey(arg1:string):Promise<void>;

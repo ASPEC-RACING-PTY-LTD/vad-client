@@ -61,6 +61,9 @@ type API interface {
 
 	Snapshot(ctx context.Context) (engine.Snapshot, error)
 	SetPaused(ctx context.Context, paused bool) error
+	// ClearTransfers stops the transfers in progress and starts them again
+	// from the beginning. Returns how many were stopped.
+	ClearTransfers(ctx context.Context) (int64, error)
 	// ResetSyncData forgets what was uploaded from the caller's folders (file
 	// index, queue, history) and rescans them, so everything is uploaded
 	// again. Returns the number of files forgotten.

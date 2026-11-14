@@ -75,6 +75,8 @@ func (e *Engine) dispatch() {
 		return
 	case e.held.Load():
 		return // the computer is busy; govern wakes the dispatcher
+	case e.clearing.Load():
+		return // ClearTransfers kicks once the sessions are discarded
 	}
 	// At most as many files as the transfer limit are in flight, so the
 	// first files in the queue get the connections instead of every file
