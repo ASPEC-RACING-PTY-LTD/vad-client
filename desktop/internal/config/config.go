@@ -49,7 +49,12 @@ type SyncConfig struct {
 	ExcludePatterns []string `json:"exclude_patterns,omitempty"`
 	// ModifiedAfter skips files last modified before this date (RFC 3339).
 	ModifiedAfter string `json:"modified_after,omitempty"`
-	SkipHidden    bool   `json:"skip_hidden"`
+	// SkipHidden is always on: hidden and system files and folders are
+	// skipped. IncludeHidden lists hidden subfolders (relative paths) that
+	// sync anyway because they were added explicitly; it does not narrow
+	// the selection like IncludeSubfolders.
+	SkipHidden    bool     `json:"skip_hidden"`
+	IncludeHidden []string `json:"include_hidden,omitempty"`
 	// Mode is "auto" (watch and upload continuously) or "manual" (only
 	// when the user presses Sync now).
 	Mode                string `json:"mode"`
@@ -68,6 +73,7 @@ type SyncConfig struct {
 // Normalize fills defaults and cleans values.
 func (c *SyncConfig) Normalize() {
 	c.Name = strings.TrimSpace(c.Name)
+	c.SkipHidden = true
 	if c.Kind == "" {
 		c.Kind = "folder"
 	}
@@ -108,6 +114,7 @@ func (c *SyncConfig) Normalize() {
 	c.IncludeExtensions = norm(c.IncludeExtensions, true)
 	c.ExcludeExtensions = norm(c.ExcludeExtensions, true)
 	c.IncludeSubfolders = norm(c.IncludeSubfolders, false)
+	c.IncludeHidden = norm(c.IncludeHidden, false)
 	c.ExcludeSubfolders = norm(c.ExcludeSubfolders, false)
 	var files []string
 	for _, f := range c.Files {

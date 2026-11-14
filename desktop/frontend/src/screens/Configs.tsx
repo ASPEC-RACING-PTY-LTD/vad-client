@@ -282,6 +282,12 @@ function Editor({ initial, onClose, onSaved }: { initial: Cfg | null; onClose: (
                   <Field label="Exclude subfolders" hint="Relative paths, e.g. Temp or Archive/Old">
                     <ListInput value={c.exclude_subfolders ?? []} onChange={(v) => set({ exclude_subfolders: v })} placeholder="Add a subfolder" mono />
                   </Field>
+                  <Field
+                    label="Hidden folders to include"
+                    hint="Hidden and system files and folders are always skipped. Add a hidden folder here (relative path, e.g. HIDDEN or Captures/.raw) to sync it; hidden folders inside it need adding too."
+                  >
+                    <ListInput value={c.include_hidden ?? []} onChange={(v) => set({ include_hidden: v })} placeholder="Add a hidden folder" mono />
+                  </Field>
                 </div>
               )}
             </div>
@@ -334,9 +340,6 @@ function Editor({ initial, onClose, onSaved }: { initial: Cfg | null; onClose: (
             <Field label="Only files modified after">
               <input className="input" type="date" value={c.modified_after ?? ''} onChange={(e) => set({ modified_after: e.target.value })} />
             </Field>
-            <div className="pt-6">
-              <Toggle checked={c.skip_hidden} onChange={(v) => set({ skip_hidden: v })} label="Skip hidden and system files" />
-            </div>
           </div>
         </section>
 

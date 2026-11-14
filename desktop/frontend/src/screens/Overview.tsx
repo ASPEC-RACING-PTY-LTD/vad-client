@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { ArrowUpFromLine, CheckCircle2, FolderPlus, Gauge, Layers, RefreshCw, Timer, X, XCircle } from 'lucide-react'
+import { CheckCircle2, FolderPlus, Gauge, Layers, RefreshCw, Timer, X, XCircle } from 'lucide-react'
 import { ListConfigs, SyncNow } from '../../wailsjs/go/main/App'
 import type { agent, engine } from '../../wailsjs/go/models'
-import { Button, EmptyState, ProgressBar, Stat, useUI } from '../ui'
+import { Button, EmptyState, Stat, useUI } from '../ui'
 import { formatBytes, formatDuration, formatSpeed, timeAgo } from '../lib'
+import { AutomationsCard } from './Automations'
 
 const DISMISS_KEY = 'vd.failedDismissedAt'
 
@@ -17,47 +18,7 @@ function limitLine(s?: engine.Stats) {
   return `limit ${s.concurrency_limit} of ${g.hardware} for this PC`
 }
 
-// phaseLabel is the right-hand status of a transfer row.
-function phaseLabel(a: engine.ActiveView) {
-  if (a.phase === 'hashing') return 'checking file…'
-  if (a.phase === 'starting') return 'starting…'
-  if (a.phase === 'finalizing') return 'finishing on the server…'
-  return `${formatBytes(a.sent)} / ${formatBytes(a.size)} · ${formatSpeed(a.speed)}`
-}
-
-export function ActiveList({ items }: { items: engine.ActiveView[] }) {
-  if (!items.length) return <div className="px-5 py-8 text-center text-sm text-slate-500">Nothing is transferring right now.</div>
-  return (
-    <div className="divide-y divide-slate-100 dark:divide-slate-800">
-      {items.map((a) => {
-        const finishing = a.phase === 'finalizing'
-        return (
-          // Fixed row height and a fixed-width status column keep rows from
-          // shifting as their numbers change.
-          <div key={a.id} className="h-[68px] px-5 py-3">
-            <div className="flex items-center justify-between gap-3 text-sm">
-              <span className="min-w-0 truncate font-medium" title={a.path}>
-                {a.path}
-              </span>
-              <span className="w-56 shrink-0 truncate text-right text-xs text-slate-500 tabular-nums">{phaseLabel(a)}</span>
-            </div>
-            <div className="mt-0.5 truncate text-xs text-slate-500">
-              {a.config} → {a.remote}
-            </div>
-            {/* Finishing keeps a full bar (everything was sent) instead of switching to a sliding one. */}
-            <ProgressBar
-              value={finishing ? 100 : a.size ? (a.sent / a.size) * 100 : 0}
-              indeterminate={a.phase === 'hashing' || a.phase === 'starting'}
-              className={finishing ? 'mt-2 h-1.5 animate-pulse' : 'mt-2 h-1.5'}
-            />
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-export function Overview({ snap, boot, goto }: { snap: engine.Snapshot | null; boot: agent.Bootstrap; goto: (t: any) => void }) {
+export function Overview({ snap, boot, goto, showAutomations }: { snap: engine.Snapshot | null; boot: agent.Bootstrap; goto: (t: any) => void; showAutomations: boolean }) {
   const [configs, setConfigs] = useState<engine.ConfigView[]>([])
   const { toast } = useUI()
   useEffect(() => {
@@ -161,20 +122,15 @@ export function Overview({ snap, boot, goto }: { snap: engine.Snapshot | null; b
       )}
       {showFailed && (
         <div className="mt-4 flex items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200">
-          <button onClick={() => goto('transfers')} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-            <XCircle className="size-5 shrink-0" /> {s?.failed} file(s) failed to upload. Open Transfers to see why and retry.
+          <button onClick={() => goto('configs')} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+            <XCircle className="size-5 shrink-0" /> {s?.failed} file(s) failed to upload. Open Sync to retry them.
           </button>
           <button onClick={dismiss} title="Dismiss" aria-label="Dismiss" className="shrink-0 rounded-lg p-1 hover:bg-rose-100 dark:hover:bg-rose-500/20">
             <X className="size-4" />
           </button>
         </div>
       )}
-      <div className="card mt-6 overflow-hidden">
-        <div className="flex items-center gap-2 border-b border-slate-200 px-5 py-3 text-sm font-semibold dark:border-slate-800">
-          <ArrowUpFromLine className="size-4 text-brand-500" /> Transferring now
-        </div>
-        <ActiveList items={snap?.active ?? []} />
-      </div>
+      {showAutomations && <AutomationsCard />}
     </div>
   )
 }

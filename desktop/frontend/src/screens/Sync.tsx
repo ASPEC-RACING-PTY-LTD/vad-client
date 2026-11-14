@@ -5,6 +5,8 @@ import { ConfigsScreen } from "./Configs";
 import { BackupsScreen } from "./Backups";
 import { ReadinessScreen } from "./Readiness";
 import { IssuesScreen } from "./Issues";
+import { TransfersCard } from "./Transfers";
+import type { engine } from "../../wailsjs/go/models";
 
 const labels: Record<SyncSection, string> = {
   configs: "Folders & files",
@@ -24,6 +26,8 @@ export function SyncScreen({
   issueJob,
   onIssueJob,
   onSetup,
+  snap,
+  showTransfers,
 }: {
   sections: SyncSection[];
   section: SyncSection;
@@ -31,6 +35,8 @@ export function SyncScreen({
   issueJob: number;
   onIssueJob: (id: number) => void;
   onSetup: () => void;
+  snap: engine.Snapshot | null;
+  showTransfers: boolean;
 }) {
   return (
     <div className="mx-auto max-w-5xl">
@@ -62,6 +68,7 @@ export function SyncScreen({
           </div>
         )}
       </div>
+      {showTransfers && <TransfersCard snap={snap} />}
       {section === "configs" && <ConfigsScreen />}
       {section === "backups" && (
         <BackupsScreen

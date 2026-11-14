@@ -568,6 +568,7 @@ export namespace config {
 	    exclude_patterns?: string[];
 	    modified_after?: string;
 	    skip_hidden: boolean;
+	    include_hidden?: string[];
 	    mode: string;
 	    scan_interval_minutes: number;
 	    stable_seconds: number;
@@ -603,6 +604,7 @@ export namespace config {
 	        this.exclude_patterns = source["exclude_patterns"];
 	        this.modified_after = source["modified_after"];
 	        this.skip_hidden = source["skip_hidden"];
+	        this.include_hidden = source["include_hidden"];
 	        this.mode = source["mode"];
 	        this.scan_interval_minutes = source["scan_interval_minutes"];
 	        this.stable_seconds = source["stable_seconds"];
@@ -691,6 +693,7 @@ export namespace engine {
 	    exclude_patterns?: string[];
 	    modified_after?: string;
 	    skip_hidden: boolean;
+	    include_hidden?: string[];
 	    mode: string;
 	    scan_interval_minutes: number;
 	    stable_seconds: number;
@@ -733,6 +736,7 @@ export namespace engine {
 	        this.exclude_patterns = source["exclude_patterns"];
 	        this.modified_after = source["modified_after"];
 	        this.skip_hidden = source["skip_hidden"];
+	        this.include_hidden = source["include_hidden"];
 	        this.mode = source["mode"];
 	        this.scan_interval_minutes = source["scan_interval_minutes"];
 	        this.stable_seconds = source["stable_seconds"];

@@ -5,6 +5,8 @@ export type ModuleId = 'core' | 'sync' | 'automation' | 'profiles' | 'vss' | 'di
 
 // Screen ids of the desktop navigation, and the sections of the Sync screen
 // (folders, and the backup sections when this PC has the backup service).
+// "transfers" and "automations" are no longer pages: they are cards on Sync
+// and Overview, gated the same way.
 export type ScreenId = 'overview' | 'sync' | 'transfers' | 'automations' | 'settings'
 export type SyncSection = 'configs' | 'backups' | 'readiness' | 'issues'
 

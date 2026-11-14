@@ -17,14 +17,7 @@ import {
   ResetSyncData,
   SaveSettings,
 } from "../../wailsjs/go/main/App";
-import type {
-  agent,
-  config,
-  engine,
-  main,
-  updater,
-} from "../../wailsjs/go/models";
-import { ModeSection } from "./Mode";
+import type { agent, config, engine, updater } from "../../wailsjs/go/models";
 import { EventsOn } from "../../wailsjs/runtime/runtime";
 import { Button, Field, PageLoader, Toggle, useUI } from "../ui";
 import { errMsg, timeAgo } from "../lib";
@@ -110,12 +103,10 @@ const section = "card space-y-4 p-5";
 export function SettingsScreen({
   boot,
   snap,
-  mode,
   onChanged,
 }: {
   boot: agent.Bootstrap;
   snap: engine.Snapshot | null;
-  mode: main.ModeView | null;
   onChanged: () => void;
 }) {
   const [s, setS] = useState<config.Settings | null>(null);
@@ -173,117 +164,6 @@ export function SettingsScreen({
           </section>
 
           <LockSettings className={section} />
-
-          <section className={section}>
-            <h2 className="font-semibold">Transfers</h2>
-            {boot.server_info?.admin ? (
-              <Field label="Parallel transfers" hint={autoHint}>
-                <select
-                  className="input max-w-xs"
-                  value={s.concurrency_mode}
-                  onChange={(e) => save({ concurrency_mode: e.target.value })}
-                >
-                  <option value="auto">Automatic</option>
-                  <option value="manual">
-                    Fixed number (administrators only)
-                  </option>
-                </select>
-              </Field>
-            ) : (
-              <Field label="Parallel transfers" hint={autoHint}>
-                <div className="input max-w-xs bg-slate-50 text-slate-600 dark:bg-slate-800/50 dark:text-slate-300">
-                  Automatic
-                </div>
-              </Field>
-            )}
-            {boot.server_info?.admin && s.concurrency_mode === "manual" && (
-              <Field
-                label="Fixed parallel transfers"
-                hint="Used as set, whatever else the computer is doing."
-              >
-                <input
-                  className="input w-28"
-                  type="number"
-                  min={1}
-                  max={128}
-                  value={s.manual_parallel}
-                  onChange={(e) =>
-                    save({ manual_parallel: Number(e.target.value) })
-                  }
-                />
-              </Field>
-            )}
-            {snap?.stats.governor && (
-              <p className="text-sm text-slate-500">
-                Now: up to {snap.stats.concurrency_limit} at once (this computer
-                can take up to {snap.stats.governor.hardware}).
-                {snap.stats.governor.reason
-                  ? ` ${snap.stats.governor.reason[0].toUpperCase()}${snap.stats.governor.reason.slice(1)}.`
-                  : ""}
-              </p>
-            )}
-            <Field
-              label="Upload bandwidth limit"
-              hint="0 means unlimited. Leaves room for gaming and calls on slower connections."
-            >
-              <BandwidthInput
-                kbps={s.bandwidth_kbps}
-                onChange={(v) => save({ bandwidth_kbps: v })}
-              />
-            </Field>
-          </section>
-
-          <section className={section}>
-            <h2 className="font-semibold">
-              Direct uploads on your local network
-            </h2>
-            <Toggle
-              checked={s.direct_upload}
-              onChange={(v) =>
-                save({
-                  direct_upload: v,
-                  direct_url: (directURL ?? s.direct_url ?? "").trim(),
-                })
-              }
-              label="Upload directly to the server's local address"
-              description="For a PC on the same network as the server: sync and backup uploads skip the public address and its upload and speed limits. VaultDock checks that the address reaches this same server and uses the public address whenever it does not (for example away from home). An administrator can turn this off from the admin panel."
-            />
-            <Field
-              label="Server's local address"
-              hint="The server's IP and port on your network, for example 192.168.1.20:3000 (the port VaultDock is published on)."
-            >
-              <div className="flex gap-2">
-                <input
-                  className="input max-w-xs"
-                  placeholder="192.168.1.20:3000"
-                  value={directURL ?? s.direct_url ?? ""}
-                  onChange={(e) => setDirectURL(e.target.value)}
-                />
-                <Button
-                  disabled={
-                    directURL === null ||
-                    directURL.trim() === (s.direct_url ?? "")
-                  }
-                  onClick={async () => {
-                    await save({ direct_url: (directURL ?? "").trim() });
-                    setDirectURL(null);
-                  }}
-                >
-                  Save
-                </Button>
-              </div>
-            </Field>
-            {s.direct_upload && snap?.direct && (
-              <p
-                className={`text-sm ${snap.direct.active ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}
-              >
-                {snap.direct.message || "Checking the local address…"}
-              </p>
-            )}
-            {!s.direct_upload && snap?.direct?.message && (
-              <p className="text-sm text-slate-500">{snap.direct.message}</p>
-            )}
-          </section>
         </div>
         <div className="space-y-4">
           <section className={section}>
@@ -421,26 +301,136 @@ export function SettingsScreen({
               </button>
             )}
           </section>
-
-          <section className="card flex flex-wrap items-center justify-between gap-3 p-5">
-            <div>
-              <h2 className="font-semibold">About</h2>
-              <p className="text-sm text-slate-500">
-                VaultDock desktop {boot.version}
-              </p>
-            </div>
-            <Button
-              icon={<FileText className="size-4" />}
-              onClick={() => OpenLogsFolder()}
-            >
-              Open logs folder
-            </Button>
-          </section>
         </div>
       </div>
-      <section className="card mt-4 p-5">
-        <ModeSection mode={mode} />
-      </section>
+      {/* Transfers and direct uploads side by side; About below them. */}
+      <div className="mt-4 grid items-stretch gap-4 lg:grid-cols-2">
+        <section className={`${section} h-full`}>
+          <h2 className="font-semibold">Transfers</h2>
+          {boot.server_info?.admin ? (
+            <Field label="Parallel transfers" hint={autoHint}>
+              <select
+                className="input max-w-xs"
+                value={s.concurrency_mode}
+                onChange={(e) => save({ concurrency_mode: e.target.value })}
+              >
+                <option value="auto">Automatic</option>
+                <option value="manual">
+                  Fixed number (administrators only)
+                </option>
+              </select>
+            </Field>
+          ) : (
+            <Field label="Parallel transfers" hint={autoHint}>
+              <div className="input max-w-xs bg-slate-50 text-slate-600 dark:bg-slate-800/50 dark:text-slate-300">
+                Automatic
+              </div>
+            </Field>
+          )}
+          {boot.server_info?.admin && s.concurrency_mode === "manual" && (
+            <Field
+              label="Fixed parallel transfers"
+              hint="Used as set, whatever else the computer is doing."
+            >
+              <input
+                className="input w-28"
+                type="number"
+                min={1}
+                max={128}
+                value={s.manual_parallel}
+                onChange={(e) =>
+                  save({ manual_parallel: Number(e.target.value) })
+                }
+              />
+            </Field>
+          )}
+          {snap?.stats.governor && (
+            <p className="text-sm text-slate-500">
+              Now: up to {snap.stats.concurrency_limit} at once (this computer
+              can take up to {snap.stats.governor.hardware}).
+              {snap.stats.governor.reason
+                ? ` ${snap.stats.governor.reason[0].toUpperCase()}${snap.stats.governor.reason.slice(1)}.`
+                : ""}
+            </p>
+          )}
+          <Field
+            label="Upload bandwidth limit"
+            hint="0 means unlimited. Leaves room for gaming and calls on slower connections."
+          >
+            <BandwidthInput
+              kbps={s.bandwidth_kbps}
+              onChange={(v) => save({ bandwidth_kbps: v })}
+            />
+          </Field>
+        </section>
+        <section className={`${section} h-full`}>
+          <h2 className="font-semibold">
+            Direct uploads on your local network
+          </h2>
+          <Toggle
+            checked={s.direct_upload}
+            onChange={(v) =>
+              save({
+                direct_upload: v,
+                direct_url: (directURL ?? s.direct_url ?? "").trim(),
+              })
+            }
+            label="Upload directly to the server's local address"
+            description="For a PC on the same network as the server: sync and backup uploads skip the public address and its upload and speed limits. VaultDock checks that the address reaches this same server and uses the public address whenever it does not (for example away from home). An administrator can turn this off from the admin panel."
+          />
+          <Field
+            label="Server's local address"
+            hint="The server's IP and port on your network, for example 192.168.1.20:3000 (the port VaultDock is published on)."
+          >
+            <div className="flex gap-2">
+              <input
+                className="input max-w-xs"
+                placeholder="192.168.1.20:3000"
+                value={directURL ?? s.direct_url ?? ""}
+                onChange={(e) => setDirectURL(e.target.value)}
+              />
+              <Button
+                disabled={
+                  directURL === null ||
+                  directURL.trim() === (s.direct_url ?? "")
+                }
+                onClick={async () => {
+                  await save({ direct_url: (directURL ?? "").trim() });
+                  setDirectURL(null);
+                }}
+              >
+                Save
+              </Button>
+            </div>
+          </Field>
+          {s.direct_upload && snap?.direct && (
+            <p
+              className={`text-sm ${snap.direct.active ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}
+            >
+              {snap.direct.message || "Checking the local address…"}
+            </p>
+          )}
+          {!s.direct_upload && snap?.direct?.message && (
+            <p className="text-sm text-slate-500">{snap.direct.message}</p>
+          )}
+        </section>
+      </div>
+      <div className="mt-4">
+        <section className="card flex flex-wrap items-center justify-between gap-3 p-5">
+          <div>
+            <h2 className="font-semibold">About</h2>
+            <p className="text-sm text-slate-500">
+              VaultDock desktop {boot.version}
+            </p>
+          </div>
+          <Button
+            icon={<FileText className="size-4" />}
+            onClick={() => OpenLogsFolder()}
+          >
+            Open logs folder
+          </Button>
+        </section>
+      </div>
     </div>
   );
 }

@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  Activity,
   FolderSync,
   Globe,
   LayoutDashboard,
   Pause,
   Play,
   Settings as SettingsIcon,
-  Workflow,
 } from "lucide-react";
 import { EventsOn } from "../wailsjs/runtime/runtime";
 import {
@@ -20,8 +18,6 @@ import type { agent, engine, main } from "../wailsjs/go/models";
 import { Badge, Button, cx, PageLoader, useUI } from "./ui";
 import { ConnectScreen } from "./screens/Connect";
 import { Overview } from "./screens/Overview";
-import { TransfersScreen } from "./screens/Transfers";
-import { AutomationsScreen } from "./screens/Automations";
 import { SettingsScreen } from "./screens/Settings";
 import { FirstRun, needsFirstRun } from "./screens/FirstRun";
 import { SyncScreen } from "./screens/Sync";
@@ -65,8 +61,6 @@ const statusLabel: Record<string, string> = {
 const allNav: { id: Tab; label: string; icon: any }[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "sync", label: "Sync", icon: FolderSync },
-  { id: "transfers", label: "Transfers", icon: Activity },
-  { id: "automations", label: "Automations", icon: Workflow },
   { id: "settings", label: "Settings", icon: SettingsIcon },
 ];
 
@@ -230,7 +224,7 @@ export function App() {
             >
               <n.icon className="size-4 opacity-80" />
               {n.label}
-              {n.id === "transfers" && (snap?.stats.failed ?? 0) > 0 && (
+              {n.id === "sync" && (snap?.stats.failed ?? 0) > 0 && (
                 <span className="ml-auto rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">
                   {snap?.stats.failed}
                 </span>
@@ -322,6 +316,7 @@ export function App() {
               goto={(t: string) =>
                 t === "configs" ? gotoSync("configs") : setTab(t as Tab)
               }
+              showAutomations={screenVisible("automations", enabled)}
             />
           )}
           {current === "sync" && (
@@ -332,15 +327,14 @@ export function App() {
               issueJob={issueJob}
               onIssueJob={setIssueJob}
               onSetup={() => setForceSetup(true)}
+              snap={snap}
+              showTransfers={screenVisible("transfers", enabled)}
             />
           )}
-          {current === "transfers" && <TransfersScreen snap={snap} />}
-          {current === "automations" && <AutomationsScreen />}
           {current === "settings" && (
             <SettingsScreen
               boot={boot}
               snap={snap}
-              mode={mode}
               onChanged={reload}
             />
           )}

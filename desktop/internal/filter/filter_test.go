@@ -83,3 +83,39 @@ func TestDriveRootRejected(t *testing.T) {
 		}
 	}
 }
+
+// Hidden folders are skipped unless added explicitly, whatever SkipHidden
+// says; a hidden folder inside an added one needs adding too.
+func TestHiddenFolders(t *testing.T) {
+	c := &config.SyncConfig{Name: "Clips", Kind: "folder", LocalPath: `C:\Clips`, Destination: "/Clips", Recursive: true, SkipHidden: false}
+	c.Normalize()
+	f := New(c)
+	if f.WalkDir("HIDDEN", true) {
+		t.Fatal("hidden folder walked without being added")
+	}
+	if !f.WalkDir("Visible", false) {
+		t.Fatal("normal folder skipped")
+	}
+	if ok, _ := f.Match("Visible/.secret.mp4", 1, time.Now(), true); ok {
+		t.Fatal("hidden file selected")
+	}
+
+	c.IncludeHidden = []string{"HIDDEN", "Nest/.a/.b"}
+	c.Normalize()
+	f = New(c)
+	if !f.WalkDir("HIDDEN", true) || !f.WalkDir("hidden", true) {
+		t.Fatal("added hidden folder skipped")
+	}
+	if ok, why := f.Match("HIDDEN/clip.mp4", 1, time.Now(), false); !ok {
+		t.Fatalf("file in an added hidden folder: %s", why)
+	}
+	if f.WalkDir("HIDDEN/.inner", true) {
+		t.Fatal("hidden folder inside an added one walked without being added")
+	}
+	if !f.WalkDir("Nest/.a", true) || !f.WalkDir("Nest/.a/.b", true) {
+		t.Fatal("path to an added hidden folder not walked")
+	}
+	if ok, _ := f.Match("Other/clip.mp4", 1, time.Now(), false); !ok {
+		t.Fatal("IncludeHidden narrowed the selection")
+	}
+}

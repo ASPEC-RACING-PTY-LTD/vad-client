@@ -59,6 +59,23 @@ func underAny(rel string, folders []string) bool {
 	return false
 }
 
+// hiddenAdded reports whether a hidden folder or file was added explicitly:
+// it is listed in IncludeHidden or IncludeSubfolders, or lies on the way to
+// one that is ("Clips/.cache" when "Clips/.cache/thumbs" was added).
+// Hidden folders inside an added one still need adding themselves.
+func (f *Filter) hiddenAdded(rel string) bool {
+	low := strings.ToLower(rel)
+	for _, list := range [][]string{f.c.IncludeHidden, f.c.IncludeSubfolders} {
+		for _, e := range list {
+			le := strings.ToLower(strings.Trim(strings.ReplaceAll(e, `\`, "/"), "/"))
+			if le == low || strings.HasPrefix(le, low+"/") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // WalkDir reports whether the scanner should descend into a directory
 // (relative path with forward slashes).
 func (f *Filter) WalkDir(rel string, hidden bool) bool {
@@ -68,7 +85,7 @@ func (f *Filter) WalkDir(rel string, hidden bool) bool {
 	if !f.c.Recursive {
 		return false
 	}
-	if f.c.SkipHidden && hidden {
+	if hidden && !f.hiddenAdded(rel) {
 		return false
 	}
 	if underAny(rel, f.c.ExcludeSubfolders) {
@@ -106,7 +123,7 @@ func (f *Filter) Match(rel string, size int64, mtime time.Time, hidden bool) (bo
 	if matchesAny(f.builtinIgnore, name) {
 		return false, "temporary or system file"
 	}
-	if f.c.SkipHidden && hidden {
+	if hidden && f.c.Kind != "file" && !f.hiddenAdded(rel) {
 		return false, "hidden file"
 	}
 	if dir != "" {
